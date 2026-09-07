@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))
-from dataset import make_train_val_datasets
+from dataset import make_train_val_datasets, SemanticKITTIDataset, VAL_SEQUENCES
 from pointnet2 import PointNet2Seg
 from metrics import IoUMeter
 from class_mapping import NUM_CLASSES, IGNORE
@@ -67,6 +67,22 @@ def validate(model, val_loader, device, num_classes):
     return total_loss / max(n_batches, 1), per_class, miou
 
 
+def full_scan_spot_check(model, loader, device, num_classes):
+    """Runs eval on complete, untruncated scans (batch_size=1, variable N) rather
+    than the fixed-size subsample `validate()` uses. Catches a model that only
+    works at training-time point density before a full 60-epoch run finishes --
+    see pointnet_utils.py's docstring on ball query vs kNN for why that gap
+    can otherwise be huge (0.91 vs 0.50 mIoU was observed here once)."""
+    model.eval()
+    meter = IoUMeter(num_classes)
+    with torch.no_grad():
+        for points, labels in loader:
+            points, labels = points.to(device), labels.to(device)
+            preds = model(points).argmax(dim=-1)
+            meter.update(preds, labels)
+    return meter.compute()
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data-root", default=os.path.join("..", "data", "semantickitti", "dataset"))
@@ -80,6 +96,10 @@ def main():
     p.add_argument("--amp", action="store_true", default=True)
     p.add_argument("--max-train-scans", type=int, default=None, help="cap train set size for fast iteration/debugging")
     p.add_argument("--max-val-scans", type=int, default=None, help="cap val set size for fast iteration/debugging")
+    p.add_argument("--full-scan-check-scans", type=int, default=150,
+                   help="each validation round, also spot-check this many COMPLETE untruncated "
+                        "scans (not the fixed-size training subsample) to catch a density-sensitive "
+                        "model early. 0 disables it.")
     args = p.parse_args()
 
     os.makedirs(CKPT_DIR, exist_ok=True)
@@ -97,6 +117,12 @@ def main():
                                num_workers=args.num_workers, drop_last=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers)
+
+    full_scan_loader = None
+    if args.full_scan_check_scans > 0:
+        full_scan_ds = SemanticKITTIDataset(args.data_root, VAL_SEQUENCES, num_points=None, augment=False)
+        full_scan_ds.samples = full_scan_ds.samples[: args.full_scan_check_scans]
+        full_scan_loader = DataLoader(full_scan_ds, batch_size=1, shuffle=False, num_workers=0)
 
     print("estimating class weights from a training subsample...")
     class_weights = estimate_class_weights(train_ds, NUM_CLASSES).to(device)
@@ -154,6 +180,11 @@ def main():
                 torch.save({"model_state_dict": model.state_dict(), "epoch": epoch,
                             "miou": miou, "per_class_iou": per_class_iou}, os.path.join(CKPT_DIR, "best.pth"))
                 print(f"  new best mIoU {miou:.4f} -> saved best.pth")
+
+            if full_scan_loader is not None:
+                fs_per_class, fs_miou = full_scan_spot_check(model, full_scan_loader, device, NUM_CLASSES)
+                print(f"  [full-scan spot check, {len(full_scan_loader)} scans] mIoU={fs_miou:.4f} per_class={fs_per_class}")
+                entry.update({"full_scan_miou": fs_miou, "full_scan_per_class_iou": fs_per_class})
 
         history.append(entry)
         torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": opt.state_dict(),

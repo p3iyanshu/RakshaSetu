@@ -32,10 +32,13 @@ DEFAULT_CHECKPOINT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "c
 class PointNet2Seg(nn.Module):
     def __init__(self, num_classes=NUM_CLASSES, in_feat_channels=1):
         super().__init__()
-        self.sa1 = SetAbstraction(n_sample=2048, k=32, in_channels=in_feat_channels, mlp_channels=[32, 32, 64])
-        self.sa2 = SetAbstraction(n_sample=512, k=32, in_channels=64, mlp_channels=[64, 64, 128])
-        self.sa3 = SetAbstraction(n_sample=128, k=32, in_channels=128, mlp_channels=[128, 128, 256])
-        self.sa4 = SetAbstraction(n_sample=32, k=16, in_channels=256, mlp_channels=[256, 256, 512])
+        # radii are physical meters, not point counts -- chosen for outdoor driving
+        # scale (cars ~4m, pedestrians ~0.5m, scans out to ~80-100m), so the
+        # receptive field stays meaningful regardless of local point density.
+        self.sa1 = SetAbstraction(n_sample=2048, radius=0.5, k=32, in_channels=in_feat_channels, mlp_channels=[32, 32, 64])
+        self.sa2 = SetAbstraction(n_sample=512, radius=1.0, k=32, in_channels=64, mlp_channels=[64, 64, 128])
+        self.sa3 = SetAbstraction(n_sample=128, radius=2.0, k=32, in_channels=128, mlp_channels=[128, 128, 256])
+        self.sa4 = SetAbstraction(n_sample=32, radius=4.0, k=16, in_channels=256, mlp_channels=[256, 256, 512])
 
         self.fp4 = FeaturePropagation(in_channels=512 + 256, mlp_channels=[256, 256])
         self.fp3 = FeaturePropagation(in_channels=256 + 128, mlp_channels=[256, 128])

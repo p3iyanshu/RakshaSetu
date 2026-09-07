@@ -9,8 +9,19 @@ Downsampling uses random sampling rather than iterative farthest-point
 sampling: FPS is the textbook PointNet++ choice but is O(M*N) per layer and
 noticeably slower for no real accuracy win at these point counts; RandLA-Net
 (Hu et al. 2020) showed random sampling works about as well in practice
-while being O(1). Grouping uses exact kNN via torch.cdist, which is fine at
-this scale (largest distance matrix here is a few tens of MB per batch item).
+while being O(1).
+
+Grouping uses ball query (fixed physical radius, capped at k neighbors) via
+torch.cdist -- NOT plain k-nearest-neighbors. This matters a lot here: LiDAR
+scans handed to `classify()` at inference are full, ~100k-point clouds, while
+training subsamples to a fixed 8192 points/scan for speed. Pure kNN's
+neighborhood size is defined by "however far away the k-th closest point
+happens to be," which shrinks physically as point density rises -- so a
+kNN-based model trained at one density silently sees a totally different
+receptive field at another (measured mIoU: 0.91 at training density, 0.50 on
+full real scans, same checkpoint). Ball query defines the neighborhood in
+real-world meters instead, so the model sees a consistent receptive field
+regardless of how dense the input happens to be.
 """
 import torch
 import torch.nn as nn
@@ -33,22 +44,38 @@ def random_sample(xyz, n_sample):
     return idx
 
 
-def knn_group(query_xyz, xyz, k):
+def ball_query_group(query_xyz, xyz, radius, k):
     """query_xyz: (B, S, 3) centers; xyz: (B, N, 3) full set -> idx: (B, S, K) indices into xyz
-    of the k nearest neighbors of each center."""
+    of up to k points within `radius` (physical distance) of each center.
+
+    If fewer than k points fall within the radius, the group is padded by
+    repeating its nearest point (standard PointNet++ ball-query behavior) --
+    this preserves the neighborhood's *metric* meaning (a genuinely sparse
+    region stays looking sparse to the MLP) instead of silently reaching
+    further out the way plain kNN would. If even the single nearest point
+    exceeds the radius (an isolated center with nothing nearby), that nearest
+    point is used for the whole group as a fallback so every center still
+    gets a well-defined, non-degenerate group.
+    """
     dists = torch.cdist(query_xyz, xyz)  # (B, S, N)
-    idx = dists.topk(k, dim=-1, largest=False).indices
+    k = min(k, xyz.shape[1])
+    sorted_dists, sorted_idx = dists.topk(k, dim=-1, largest=False)  # ascending, so "within radius" is a prefix
+    within_radius = sorted_dists <= radius
+    nearest_idx = sorted_idx[..., 0:1].expand_as(sorted_idx)
+    idx = torch.where(within_radius, sorted_idx, nearest_idx)
     return idx
 
 
 class SetAbstraction(nn.Module):
-    """Downsample N points -> n_sample points; for each sampled center, gather its
-    k nearest neighbors, run a shared MLP over (relative_xyz, features), then
-    max-pool over the neighborhood -> one feature vector per sampled center."""
+    """Downsample N points -> n_sample points; for each sampled center, gather up
+    to k points within a fixed physical radius, run a shared MLP over
+    (relative_xyz, features), then max-pool over the neighborhood -> one
+    feature vector per sampled center."""
 
-    def __init__(self, n_sample, k, in_channels, mlp_channels):
+    def __init__(self, n_sample, radius, k, in_channels, mlp_channels):
         super().__init__()
         self.n_sample = n_sample
+        self.radius = radius
         self.k = k
         layers = []
         last = in_channels + 3  # +3 for relative xyz concatenated into every group
@@ -64,12 +91,12 @@ class SetAbstraction(nn.Module):
         sample_idx = random_sample(xyz, min(self.n_sample, N))
         new_xyz = index_points(xyz, sample_idx)  # (B, S, 3)
 
-        knn_idx = knn_group(new_xyz, xyz, min(self.k, N))  # (B, S, K)
-        grouped_xyz = index_points(xyz, knn_idx)  # (B, S, K, 3)
+        group_idx = ball_query_group(new_xyz, xyz, self.radius, self.k)  # (B, S, K)
+        grouped_xyz = index_points(xyz, group_idx)  # (B, S, K, 3)
         grouped_xyz_rel = grouped_xyz - new_xyz.unsqueeze(2)  # relative position within the neighborhood
 
         if features is not None:
-            grouped_features = index_points(features, knn_idx)  # (B, S, K, C)
+            grouped_features = index_points(features, group_idx)  # (B, S, K, C)
             grouped = torch.cat([grouped_xyz_rel, grouped_features], dim=-1)
         else:
             grouped = grouped_xyz_rel
