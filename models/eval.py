@@ -1,8 +1,10 @@
 """
-Final evaluation: runs a trained checkpoint over the FULL, untruncated
-sequence-08 point clouds (not the fixed-size random subsample train.py uses
-for fast periodic validation) and reports per-class IoU + mIoU. This is the
-number to put in the pitch deck.
+Final evaluation: runs the exact `classify()` inference path (see
+pointnet2.py -- downsample to training density, predict, propagate back to
+every original point) over the FULL, untruncated sequence-08 point clouds and
+reports per-class IoU + mIoU. This is the number to put in the pitch deck,
+since it measures the same code path a real deployment calls, not a
+synthetic direct-forward-pass shortcut.
 
     python eval.py --checkpoint checkpoints/best.pth --data-root ../data/semantickitti/dataset
 """
@@ -13,12 +15,11 @@ import sys
 import time
 
 import torch
-from torch.utils.data import DataLoader
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))
 from dataset import SemanticKITTIDataset, VAL_SEQUENCES
-from pointnet2 import PointNet2Seg
+from pointnet2 import classify
 from metrics import IoUMeter
 from class_mapping import NUM_CLASSES
 
@@ -32,30 +33,20 @@ def main():
     p.add_argument("--out", default=os.path.join("checkpoints", "eval_report.json"))
     args = p.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
     ds = SemanticKITTIDataset(args.data_root, args.sequences, num_points=None, augment=False)
     if args.max_scans:
         ds.samples = ds.samples[: args.max_scans]
-    loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=0)
     print(f"evaluating on {len(ds)} full scans from sequences {args.sequences}")
-
-    model = PointNet2Seg(num_classes=NUM_CLASSES).to(device)
-    ckpt = torch.load(args.checkpoint, map_location=device)
-    model.load_state_dict(ckpt.get("model_state_dict", ckpt))
-    model.eval()
-    print(f"loaded {args.checkpoint} (trained to epoch {ckpt.get('epoch', '?')}, "
-          f"train-time subsampled mIoU {ckpt.get('miou', '?')})")
+    print(f"checkpoint: {args.checkpoint}")
 
     meter = IoUMeter(NUM_CLASSES)
     t0 = time.time()
-    with torch.no_grad():
-        for i, (points, labels) in enumerate(loader):
-            points, labels = points.to(device), labels.to(device)
-            logits = model(points)
-            preds = logits.argmax(dim=-1)
-            meter.update(preds, labels)
-            if i % 500 == 0:
-                print(f"  {i}/{len(ds)} scans ({time.time()-t0:.0f}s elapsed)")
+    for i in range(len(ds)):
+        points, labels = ds[i]
+        pred_labels, _ = classify(points.numpy(), checkpoint_path=args.checkpoint)
+        meter.update(torch.from_numpy(pred_labels.astype("int64")), labels)
+        if i % 500 == 0:
+            print(f"  {i}/{len(ds)} scans ({time.time()-t0:.0f}s elapsed)")
 
     per_class, miou = meter.compute()
     dt = time.time() - t0
