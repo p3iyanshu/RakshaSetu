@@ -26,6 +26,10 @@ class SemanticKITTIDataset(Dataset):
         subsampled (without replacement) if the raw scan has more, and
         subsampled *with* replacement (repeated) if it has fewer, so batches
         can be stacked into a single tensor without ragged-length handling.
+        Pass None to get the full, untruncated scan back (variable length --
+        use batch_size=1 in the DataLoader). Used for final whole-cloud eval,
+        since training-time subsampling is a slightly biased proxy for the
+        real headline mIoU number.
     augment: light train-time jitter + random yaw rotation (no-op at eval).
     """
 
@@ -84,7 +88,8 @@ class SemanticKITTIDataset(Dataset):
     def __getitem__(self, i):
         points, labels = self._load_raw(i)
         rng = np.random.default_rng()
-        points, labels = self._fixed_size_sample(points, labels, rng)
+        if self.num_points is not None:
+            points, labels = self._fixed_size_sample(points, labels, rng)
         if self.augment:
             points = self._augment(points, rng)
         return torch.from_numpy(points.astype(np.float32)), torch.from_numpy(labels.astype(np.int64))
