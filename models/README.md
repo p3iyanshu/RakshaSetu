@@ -29,18 +29,41 @@ compiled CUDA extension**. `spconv`/MinkowskiEngine need a matching nvcc+MSVC
 toolchain to build, which is a common source of pain on Windows; this trades a
 little raw throughput for "installs anywhere torch+CUDA already works."
 
-- 4 Set Abstraction levels progressively downsample (16384 -> ... -> 32 points)
-  and build up features via k-NN grouping + shared MLP + max-pool.
-- Downsampling is **random sampling**, not iterative farthest-point sampling.
-  FPS is the textbook PointNet++ choice but is O(M·N) per layer; RandLA-Net
-  (Hu et al., 2020) showed random sampling gets similar accuracy at O(1) cost,
-  which matters more here given the project's whole pitch is compute efficiency.
+- 4 Set Abstraction levels progressively downsample (8192 -> 2048 -> 512 -> 128
+  -> 32 points) and build up features via **ball query** (fixed physical
+  radius per level: 0.5/1.0/2.0/4.0m, capped at k neighbors, padded by
+  repeating the nearest point when a ball has fewer) + shared MLP + max-pool.
+  Deliberately *not* plain k-nearest-neighbors: kNN's neighborhood size
+  shrinks as point density rises, so a kNN-grouped model trained on a fixed
+  point count sees a completely different receptive field on a real full
+  scan than it did during training (measured here: 0.91 mIoU at training
+  density vs 0.50 mIoU direct on full scans, same weights, before this fix).
+- Downsampling itself is **random sampling**, not iterative farthest-point
+  sampling. FPS is the textbook PointNet++ choice but is O(M·N) per layer;
+  RandLA-Net (Hu et al., 2020) showed random sampling gets similar accuracy
+  at O(1) cost, which matters more here given the project's whole pitch is
+  compute efficiency.
 - 4 Feature Propagation levels upsample back to every input point (inverse-
   distance-weighted interpolation from the 3 nearest sparse points + skip
   connections), ending in a per-point 3-class head.
-- ~860K parameters, ~150ms/step at batch size 8 on an 8GB laptop GPU (RTX 4060) --
-  small and fast on purpose; a real-time perception stack can't afford a heavy
-  segmentation backbone.
+- ~860K parameters, small and fast on purpose; a real-time perception stack
+  can't afford a heavy segmentation backbone.
+
+### Inference: downsample, predict, propagate
+
+Even with ball query fixing the receptive field, feeding a raw ~120k-point
+scan straight through a network trained on 8192-point subsamples still loses
+accuracy (0.83 vs 0.57 mIoU on an early checkpoint) -- each of the fixed 2048
+first-layer centers then covers a much smaller share of the scene than it did
+at training density. `classify()` (`pointnet2.py`) handles this by
+downsampling to `MAX_INFERENCE_POINTS` (8192) before the forward pass, then
+giving every original point its nearest downsampled point's prediction via a
+`scipy.spatial.cKDTree` query -- recovers most of that gap (0.75 in the same
+test), and is also just the right design for a real-time system: don't run
+the heavy network at full raw resolution when the scene doesn't need it
+everywhere. The shared logic lives in `predict_with_propagation()` so
+`train.py`'s periodic full-scan spot check and `eval.py`'s final report
+exercise the exact same path `classify()` does.
 
 ## Training
 
@@ -61,15 +84,21 @@ python train.py --data-root ../data/semantickitti/dataset --epochs 60 --val-ever
 
 ## Evaluation
 
-`train.py` reports **per-class IoU + overall mIoU** on sequence 08 every
-`--val-every` epochs, using `metrics.py`'s confusion-matrix accumulator (so the
-number isn't biased by any single batch's class balance). This is the headline
-accuracy number for the pitch.
+`train.py` reports **per-class IoU + overall mIoU** on the same fixed-size
+subsample used for training, every `--val-every` epochs (fast, good for
+tracking training progress) -- plus, every validation round, a slower
+**full-scan spot check** (`--full-scan-check-scans`, default 150) that runs
+the real `predict_with_propagation()` inference path on complete, untruncated
+scans. Watch for these two numbers diverging a lot; that's the density-
+sensitivity failure mode described above resurfacing.
 
-Note: validation currently scores the same fixed-size random subsample
-(`num_points`) each scan uses for training, not the full raw point cloud --
-fine for tracking training progress, but for a final reported number consider
-adding a whole-cloud (or sliding-window) eval pass before the pitch.
+For the final headline number, run `eval.py` -- it calls `classify()` itself
+over every scan in the val sequence, so it measures exactly what a real
+deployment would see:
+
+```bash
+python eval.py --checkpoint checkpoints/best.pth --data-root ../data/semantickitti/dataset
+```
 
 ## Next steps (see task brief timeline)
 
