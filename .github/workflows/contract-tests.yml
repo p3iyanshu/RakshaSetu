@@ -1,0 +1,28 @@
+name: Contract tests
+
+# Enforces PROJECT_EXECUTION_PLAN.md SS6.2 and team_tasks/00_interfaces_and_handoff.md Part 2:
+# every module's output must match shared/schemas.py before a PR can merge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy scipy scikit-learn pytest
+
+      - name: Run contract tests
+        run: pytest tests/test_contracts.py -v
