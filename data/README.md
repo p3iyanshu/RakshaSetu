@@ -25,6 +25,11 @@ actually used for training.
    Velodyne HDL-64E's documented valid range (0.9-120m). Real-data check: this
    essentially never triggers (real KITTI ranges observed well inside the
    envelope) — it's a defensive floor, not a rule tuned to this dataset.
+   `run_cleaning_report.py` runs it over the **entire** dataset (23,201
+   frames, all 11 sequences) and logs the per-sequence drop rate the brief
+   asks for — `cleaning_drop_rate_by_sequence.csv` / `_report.csv`. Result:
+   **0.000000% dropped, every sequence** — confirms the handover's 4-frame
+   finding at full scale.
 3. **`feature_engineering.py`** (Step 3a) — 7 per-point features: `range`,
    `azimuth`, `elevation`, `z_raw`, `height_above_ground`, `local_density`,
    `intensity`. Ground height is estimated per 1m (x,y) grid cell as the 5th
