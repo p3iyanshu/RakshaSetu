@@ -3,7 +3,14 @@ Shared mock LiDAR scene generator -- the canonical fake data every member
 builds against until Member 1's real segmentation model is ready.
 
 Matches schemas.py exactly: points (N,4) x,y,z,intensity; labels (N,) in
-{DRIVABLE, STATIC_OBSTACLE, DYNAMIC_OBJECT, IGNORE}; confidence (N,) in [0,1].
+{DRIVABLE, STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE, DYNAMIC_VEHICLE,
+DYNAMIC_PEDESTRIAN, OTHER_UNKNOWN, IGNORE}; confidence (N,) in [0,1].
+
+v2 (2026-09-12): wall/pole and vehicle/pedestrian are now distinct classes
+per Member 4's ros2_ws/interfaces.md v2 -- this maps directly onto the scene
+primitives already used below (_wall_segment -> wall, _pole -> pole,
+_vehicle -> vehicle, _pedestrian -> pedestrian), so the scene layout itself
+didn't need to change, only which label constant each primitive is tagged with.
 
 Saves in two formats:
   - .npz  : easiest for any teammate to load directly with numpy
@@ -18,7 +25,10 @@ Run directly to (re)generate the sample_data/ folder:
 import os
 import numpy as np
 
-from schemas import DRIVABLE, STATIC_OBSTACLE, DYNAMIC_OBJECT, RING_BOUNDARIES
+from schemas import (
+    DRIVABLE, STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE,
+    DYNAMIC_VEHICLE, DYNAMIC_PEDESTRIAN, RING_BOUNDARIES,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SAMPLE_DIR = os.path.join(HERE, "sample_data")
@@ -129,24 +139,24 @@ def generate_frame(rng, t=0.0):
     for center, length, orientation in WALLS:
         pts = _wall_segment(rng, center, length=length, orientation_rad=orientation)
         points_list.append(pts)
-        labels_list.append(np.full(len(pts), STATIC_OBSTACLE, dtype=np.uint8))
+        labels_list.append(np.full(len(pts), STATIC_OBSTACLE_WALL, dtype=np.uint8))
 
     for center in POLES:
         pts = _pole(rng, center)
         points_list.append(pts)
-        labels_list.append(np.full(len(pts), STATIC_OBSTACLE, dtype=np.uint8))
+        labels_list.append(np.full(len(pts), STATIC_OBSTACLE_POLE, dtype=np.uint8))
 
     for start, vel in zip(PEDESTRIAN_STARTS, PEDESTRIAN_VELOCITY):
         center = (start[0] + t * vel[0], start[1] + t * vel[1])
         pts = _pedestrian(rng, center)
         points_list.append(pts)
-        labels_list.append(np.full(len(pts), DYNAMIC_OBJECT, dtype=np.uint8))
+        labels_list.append(np.full(len(pts), DYNAMIC_PEDESTRIAN, dtype=np.uint8))
 
     for start, vel, heading in zip(VEHICLE_STARTS, VEHICLE_VELOCITY, VEHICLE_HEADING):
         center = (start[0] + t * vel[0], start[1] + t * vel[1])
         pts = _vehicle(rng, center, heading_rad=heading)
         points_list.append(pts)
-        labels_list.append(np.full(len(pts), DYNAMIC_OBJECT, dtype=np.uint8))
+        labels_list.append(np.full(len(pts), DYNAMIC_VEHICLE, dtype=np.uint8))
 
     xyz = np.concatenate(points_list, axis=0).astype(np.float32)
     labels = np.concatenate(labels_list, axis=0)
@@ -190,7 +200,7 @@ def save_kitti_format(points, labels, sequence_dir, frame_id):
       sequences/<seq>/velodyne/<frame_id>.bin  -- float32 x,y,z,intensity
       sequences/<seq>/labels/<frame_id>.label  -- uint32 per-point label
 
-    NOTE: labels here are our already-remapped 0/1/2/255 scheme, not raw
+    NOTE: labels here are our already-remapped 0-5/255 scheme, not raw
     SemanticKITTI class IDs -- Member 1's real class_mapping.py step is what
     produces this remapping from the real dataset's raw labels.
     """

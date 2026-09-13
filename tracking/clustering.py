@@ -6,19 +6,28 @@ objects, using DBSCAN with eps tuned per radial distance band so that the
 naturally sparser far-range points don't get over- or under-clustered by a
 single fixed eps. Bands match Member 2's adaptive-grid resolution rings.
 """
+import os
+import sys
+
 import numpy as np
 from sklearn.cluster import DBSCAN
 
-STATIC = 1
-DYNAMIC = 2
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared"))
+from schemas import (
+    STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE,
+    DYNAMIC_VEHICLE, DYNAMIC_PEDESTRIAN, RING_BOUNDARIES,
+)
 
-# (min_radius_m, max_radius_m, grid_cell_size_m) -- same bands as the grid engine
-RING_BOUNDARIES = [
-    (0.0, 10.0, 0.05),
-    (10.0, 30.0, 0.15),
-    (30.0, 60.0, 0.30),
-    (60.0, 100.0, 0.50),
-]
+# v2 (2026-09-12): the old scheme's single STATIC/DYNAMIC pair no longer
+# covers Segmentation's output -- static split into wall/pole, dynamic split
+# into vehicle/pedestrian (shared/schemas.py). Imported from there instead
+# of hand-duplicated here, same for RING_BOUNDARIES, so this module can't
+# silently drift out of sync with Member 1's classes or Member 2's grid
+# resolution bands again.
+OBSTACLE_CLASSES = (STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE, DYNAMIC_VEHICLE, DYNAMIC_PEDESTRIAN)
+STATIC_CLASSES = (STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE)
+DYNAMIC_CLASSES = (DYNAMIC_VEHICLE, DYNAMIC_PEDESTRIAN)
+
 EPS_TO_CELL_RATIO = 6.0  # eps = cell_size * this ratio, tune during real testing
 MIN_SAMPLES = 5
 
@@ -86,19 +95,17 @@ def extract_cluster_features(points_xyz, labels, confidence, cluster_ids):
             "bbox_min": tuple(pts.min(axis=0).round(3).tolist()),
             "bbox_max": tuple(pts.max(axis=0).round(3).tolist()),
             "point_count": int(mask.sum()),
-            "dominant_class": dominant_class,  # 1=static_obstacle, 2=dynamic_object
+            "dominant_class": dominant_class,  # one of OBSTACLE_CLASSES (wall/pole/vehicle/pedestrian)
             "mean_confidence": float(conf.mean().round(3)),
         })
     return clusters
 
 
 if __name__ == "__main__":
-    import sys
-    sys.path.insert(0, "../shared")
     from mock_data import load_npz
 
     points, labels, confidence = load_npz("../shared/sample_data/npz_frames/frame_0000.npz")
-    obstacle_mask = np.isin(labels, [STATIC, DYNAMIC])
+    obstacle_mask = np.isin(labels, OBSTACLE_CLASSES)
     xyz = points[obstacle_mask, :3]
     obs_labels = labels[obstacle_mask]
     obs_confidence = confidence[obstacle_mask]
@@ -109,7 +116,7 @@ if __name__ == "__main__":
     print(f"Found {len(clusters)} clusters from {xyz.shape[0]} obstacle points "
           f"({(cluster_ids == -1).sum()} noise points)\n")
     for c in clusters:
-        cls_name = "static" if c["dominant_class"] == STATIC else "dynamic"
+        cls_name = "static" if c["dominant_class"] in STATIC_CLASSES else "dynamic"
         print(f"  cluster {c['cluster_id']}: {cls_name}, "
               f"{c['point_count']} pts, centroid={c['centroid']}, "
               f"conf={c['mean_confidence']}")

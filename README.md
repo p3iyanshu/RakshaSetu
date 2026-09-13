@@ -8,9 +8,10 @@ Team: JanSetu | Theme: Transportation & Logistics | Category: Software
 
 New to this repo? Read in this order:
 
-1. [`SIH2026_PS26053_Roadmap.md`](SIH2026_PS26053_Roadmap.md) — problem context, architecture, tech stack, and the full build roadmap
-2. [`team_tasks/00_interfaces_and_handoff.md`](team_tasks/00_interfaces_and_handoff.md) — the shared data contract every module builds against, and how to hand off finished work
-3. Your own numbered file in [`team_tasks/`](team_tasks/) — your individual task brief
+1. [`PROJECT_EXECUTION_PLAN.md`](PROJECT_EXECUTION_PLAN.md) — **binding execution plan**: detailed problem breakdown, solution differentiation, team roles, DevOps/git standards, and the timeline to the internal hackathon. Follow this; changes to scope/roles/deadlines go through it (see its Governance section).
+2. [`SIH2026_PS26053_Roadmap.md`](SIH2026_PS26053_Roadmap.md) — original problem research and extended architecture notes
+3. [`team_tasks/00_interfaces_and_handoff.md`](team_tasks/00_interfaces_and_handoff.md) — the shared data contract every module builds against, and how to hand off finished work
+4. Your own numbered file in [`team_tasks/`](team_tasks/) — your individual task brief
 
 ## Repo layout
 

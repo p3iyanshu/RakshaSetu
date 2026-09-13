@@ -35,7 +35,7 @@ def _assert_matches_segmentation_output_schema(points, labels, confidence):
     n = points.shape[0]
     assert labels.shape == (n,)
     assert confidence.shape == (n,)
-    assert set(np.unique(labels).tolist()).issubset({0, 1, 2, 255})
+    assert set(np.unique(labels).tolist()).issubset({0, 1, 2, 3, 4, 5, 255})
     assert confidence.min() >= 0.0 and confidence.max() <= 1.0
 
 
@@ -82,16 +82,18 @@ def test_tracking_output_matches_tracked_object_schema():
     """Feeds the agreed mock segmented-point-cloud sequence through the full
     clustering + tracking pipeline and asserts every emitted object matches
     schemas.TrackedObject exactly."""
-    from schemas import DYNAMIC_OBJECT, STATIC_OBSTACLE
+    from schemas import STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE, DYNAMIC_VEHICLE, DYNAMIC_PEDESTRIAN
     from clustering import cluster_obstacles, extract_cluster_features
     from kalman_tracker import MultiObjectTracker
+
+    obstacle_classes = [STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE, DYNAMIC_VEHICLE, DYNAMIC_PEDESTRIAN]
 
     frames = generate_sequence(n_frames=10, seed=0)
     tracker = MultiObjectTracker(min_hits=1)
 
     seen_any = False
     for points, labels, confidence in frames:
-        obstacle_mask = np.isin(labels, [STATIC_OBSTACLE, DYNAMIC_OBJECT])
+        obstacle_mask = np.isin(labels, obstacle_classes)
         xyz = points[obstacle_mask, :3].astype(np.float64)
         obs_labels = labels[obstacle_mask]
         obs_confidence = confidence[obstacle_mask]
@@ -102,11 +104,12 @@ def test_tracking_output_matches_tracked_object_schema():
 
         for obj in objects:
             seen_any = True
-            assert set(obj.keys()) == {"track_id", "cls", "position", "velocity", "is_dynamic", "confidence"}
+            assert set(obj.keys()) == {"track_id", "cls", "position", "velocity", "velocity_relative", "is_dynamic", "confidence"}
             assert isinstance(obj["track_id"], int)
-            assert obj["cls"] in (STATIC_OBSTACLE, DYNAMIC_OBJECT)
+            assert obj["cls"] in obstacle_classes
             assert isinstance(obj["position"], tuple) and len(obj["position"]) == 3
-            assert isinstance(obj["velocity"], tuple) and len(obj["velocity"]) == 2
+            assert isinstance(obj["velocity"], tuple) and len(obj["velocity"]) == 3
+            assert isinstance(obj["velocity_relative"], tuple) and len(obj["velocity_relative"]) == 3
             assert isinstance(obj["is_dynamic"], bool)
             assert 0.0 <= obj["confidence"] <= 1.0
 

@@ -9,6 +9,11 @@ env/
 *.pptx
 *.zip
 
+# Node (dashboard/frontend)
+node_modules/
+dist/
+*.local
+
 # real dataset extracts used for local validation only -- never commit raw KITTI data
 tracking/kitti_validation_data/
 
