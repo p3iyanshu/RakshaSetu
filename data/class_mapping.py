@@ -20,6 +20,20 @@ with the team rather than treating them as final.
 
 Three independent maps, one per source, because each dataset invents its own
 raw IDs. All three funnel into the same `remap_labels()` helper.
+
+!! SEMANTICKITTI_MAP BELOW IS SUPERSEDED, DO NOT USE FOR NEW WORK !!
+The team has since reviewed and approved a different, authoritative
+SemanticKITTI raw-id mapping: data/label_remap.py's RAW_TO_RAKSHASETU (see
+Member1_HANDOVER_REPORT.md). It disagrees with the (unreviewed) table below
+on 7 raw ids -- notably sidewalk/other-ground/terrain (drivable here vs.
+other_unknown there) and bicyclist/moving-bicyclist (dynamic_pedestrian here
+vs. dynamic_vehicle there). SEMANTICKITTI_MAP is kept here ONLY because
+tracking/semantic_kitti_labels.py still imports it -- that import should be
+switched to label_remap.py's RAW_TO_RAKSHASETU for consistency with the
+actual trained model, but that's Member 3's module to update, not something
+to silently change from here. Flag this to the team rather than assuming
+either table is correct. NUSCENES_NAME_MAP and CARLA_MAP below are unaffected
+(no equivalent approved table exists for those sources yet).
 """
 import numpy as np
 
