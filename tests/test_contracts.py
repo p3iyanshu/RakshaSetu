@@ -28,7 +28,7 @@ def mock_frame():
 
 
 # ---------------------------------------------------------------------------
-# Member 1 -- Stage 2: Segmentation output (models/placeholder.py, models/pointnet2.py)
+# Member 1 -- Stage 2: Segmentation output (models/placeholder.py, models/inference.py)
 # ---------------------------------------------------------------------------
 
 def _assert_matches_segmentation_output_schema(points, labels, confidence):
@@ -47,8 +47,8 @@ def test_placeholder_classify_matches_schema(mock_frame):
     _assert_matches_segmentation_output_schema(points, labels, confidence)
 
 
-def test_pointnet2_classify_matches_schema(mock_frame):
-    from pointnet2 import classify, DEFAULT_CHECKPOINT
+def test_trained_model_classify_matches_schema(mock_frame):
+    from inference import classify, DEFAULT_CHECKPOINT
 
     if not os.path.exists(DEFAULT_CHECKPOINT):
         pytest.skip("no trained checkpoint at models/checkpoints/best.pth yet -- train.py hasn't produced one")
@@ -58,20 +58,26 @@ def test_pointnet2_classify_matches_schema(mock_frame):
     _assert_matches_segmentation_output_schema(points, labels, confidence)
 
 
-def test_class_mapping_remap_covers_official_semantickitti_ids():
-    """Every raw id remap_labels() is asked to handle in practice must be a real
-    key in SEMANTICKITTI_MAP, not silently fall through to IGNORE -- that would
-    quietly corrupt training labels instead of erroring."""
-    from class_mapping import SEMANTICKITTI_MAP, remap_labels, IGNORE
+def test_label_remap_covers_every_documented_semantickitti_id():
+    """Every raw id label_remap.py claims to handle (SEMANTICKITTI_RAW_NAMES) must
+    be a real key in RAW_TO_RAKSHASETU -- label_remap.py itself already asserts
+    this at import time, but this test pins the behavior so a future edit that
+    silently removes the self-check doesn't go unnoticed. Also confirms an
+    unmapped id raises rather than silently degrading to a default class."""
+    from label_remap import RAW_TO_RAKSHASETU, remap_semantic_ids, IGNORE_LABEL
 
-    raw_ids = np.array(sorted(SEMANTICKITTI_MAP.keys()), dtype=np.uint32)
-    remapped = remap_labels(raw_ids, SEMANTICKITTI_MAP)
+    raw_ids = np.array(sorted(RAW_TO_RAKSHASETU.keys()), dtype=np.int64)
+    remapped = remap_semantic_ids(raw_ids)
     for raw_id, target in zip(raw_ids, remapped):
-        assert target == SEMANTICKITTI_MAP[int(raw_id)]
+        assert target == RAW_TO_RAKSHASETU[int(raw_id)]
 
-    # ids genuinely absent from the spec should degrade to IGNORE, not crash
-    stray = remap_labels(np.array([9999], dtype=np.uint32), SEMANTICKITTI_MAP)
-    assert stray[0] == IGNORE
+    # every remapped value must be a valid class id or IGNORE_LABEL -- never a
+    # silent default for something outside the documented taxonomy
+    assert set(remapped.tolist()).issubset(set(RAW_TO_RAKSHASETU.values()))
+    assert IGNORE_LABEL in RAW_TO_RAKSHASETU.values()
+
+    with pytest.raises(ValueError):
+        remap_semantic_ids(np.array([9999], dtype=np.int64))
 
 
 # ---------------------------------------------------------------------------

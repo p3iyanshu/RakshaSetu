@@ -1,106 +1,104 @@
 # Segmentation Model (Member 1)
 
-Implements the interface contract from `team_tasks/01_data_and_segmentation_model.md`:
+Implements the interface contract from `team_tasks/01_data_and_segmentation_model.md`
+/ `ros2_ws/interfaces.md` section 4:
 
 ```python
 classify(points: np.ndarray[N, 4]) -> labels: np.ndarray[N], confidence: np.ndarray[N]
 ```
 
-`points` is raw `(x, y, z, intensity)`. `labels` are in `{0,1,2}` (drivable /
-static_obstacle / dynamic_object -- see `shared/schemas.py`). `confidence` is
-`[0.0, 1.0]`. Works on any point count `N`, not just whatever size was used at
-training time.
+`points` is raw `(x, y, z, intensity)`. `labels` are in `{0..5}` (see
+`data/label_remap.py`'s `RAKSHASETU_CLASS_NAMES` — never `IGNORE_LABEL`,
+that's training-only). `confidence` is `[0.0, 1.0]`.
 
-## Two implementations, same signature
+## This is Khushi Singh's approved Step 5 model
 
-- **`placeholder.py`** -- the Day-1 stand-in. A per-scan adaptive ground-height
-  threshold (bottom 15th percentile of z, plus a small margin, is "ground").
-  Cannot detect dynamic objects at all. Ships with a deliberately low flat
-  confidence (0.3) so any consumer doing confidence-based filtering treats it
-  as a stand-in. Use this today; swap the import for `pointnet2.classify` once
-  a trained checkpoint exists -- nothing else about the call site changes.
-- **`pointnet2.py`** -- the real model. See "Architecture" below.
+`pointnet2_seg.py` / `pointnet2_utils.py` are the handover's unchanged,
+approved PointNet++ MSG architecture (see `Member1_HANDOVER_REPORT.md`) —
+replaces an earlier, independent SSG model built before the 6-class/
+cleaning+feature-engineering pipeline existed.
 
-## Architecture
+- `PointNet2SegMSG`: SA1 (MSG, 3 radii 0.5/1.0/2.0m) → SA2 (MSG, 3 radii
+  1/2/4m) → SA3 (SSG, r=4m) → SA4 (global) → FP4→FP1 → 6-class head.
+  ~1.02M parameters.
+- Takes raw ego-frame `xyz` (B,N,3) — **no centroid centering** (tested and
+  rejected: FPS/ball-query are translation-invariant already) — plus the 7
+  engineered `features` (B,N,7) from `data/feature_engineering.py`.
+- Uses genuine iterative farthest-point sampling + ball query (fixed
+  physical radius, not k-nearest-neighbors) — the textbook PointNet++
+  design, robust to point-density variation by construction.
+- `compute_class_weights()` / `build_loss()`: weighted `CrossEntropyLoss`,
+  `ignore_index=-1`.
 
-A PointNet++-style encoder-decoder (`PointNet2Seg` in `pointnet2.py`, built from
-the layers in `pointnet_utils.py`), implemented in **plain PyTorch with no
-compiled CUDA extension**. `spconv`/MinkowskiEngine need a matching nvcc+MSVC
-toolchain to build, which is a common source of pain on Windows; this trades a
-little raw throughput for "installs anywhere torch+CUDA already works."
+**Known cost:** true FPS's per-layer cost is set by its *output* point count
+(1024/256/64), not input N, so shrinking N barely speeds up the model itself
+— see `pc_benchmark_step6.py` and the timing notes in `train.py`'s history.
+Measured on an RTX 4060 laptop GPU: ~450-520ms/step GPU-bound at batch=8
+regardless of N∈{2048,4096,8192}; `num_workers=4` overlaps the ~96ms/frame
+CPU-side clean+feature pipeline with GPU compute, landing around 20-25
+min/epoch on the full ~19K-scan train split.
 
-- 4 Set Abstraction levels progressively downsample (8192 -> 2048 -> 512 -> 128
-  -> 32 points) and build up features via **ball query** (fixed physical
-  radius per level: 0.5/1.0/2.0/4.0m, capped at k neighbors, padded by
-  repeating the nearest point when a ball has fewer) + shared MLP + max-pool.
-  Deliberately *not* plain k-nearest-neighbors: kNN's neighborhood size
-  shrinks as point density rises, so a kNN-grouped model trained on a fixed
-  point count sees a completely different receptive field on a real full
-  scan than it did during training (measured here: 0.91 mIoU at training
-  density vs 0.50 mIoU direct on full scans, same weights, before this fix).
-- Downsampling itself is **random sampling**, not iterative farthest-point
-  sampling. FPS is the textbook PointNet++ choice but is O(M·N) per layer;
-  RandLA-Net (Hu et al., 2020) showed random sampling gets similar accuracy
-  at O(1) cost, which matters more here given the project's whole pitch is
-  compute efficiency.
-- 4 Feature Propagation levels upsample back to every input point (inverse-
-  distance-weighted interpolation from the 3 nearest sparse points + skip
-  connections), ending in a per-point 3-class head.
-- ~860K parameters, small and fast on purpose; a real-time perception stack
-  can't afford a heavy segmentation backbone.
+## Two implementations of `classify()`
 
-### Inference: downsample, predict, propagate
-
-Even with ball query fixing the receptive field, feeding a raw ~120k-point
-scan straight through a network trained on 8192-point subsamples still loses
-accuracy (0.83 vs 0.57 mIoU on an early checkpoint) -- each of the fixed 2048
-first-layer centers then covers a much smaller share of the scene than it did
-at training density. `classify()` (`pointnet2.py`) handles this by
-downsampling to `MAX_INFERENCE_POINTS` (8192) before the forward pass, then
-giving every original point its nearest downsampled point's prediction via a
-`scipy.spatial.cKDTree` query -- recovers most of that gap (0.75 in the same
-test), and is also just the right design for a real-time system: don't run
-the heavy network at full raw resolution when the scene doesn't need it
-everywhere. The shared logic lives in `predict_with_propagation()` so
-`train.py`'s periodic full-scan spot check and `eval.py`'s final report
-exercise the exact same path `classify()` does.
+- **`placeholder.py`** — the Day-1 stand-in (adaptive ground-height
+  threshold, drivable vs. a generic "static_obstacle_wall" guess for
+  everything else). Deliberately low flat confidence (0.3) signals "not a
+  real model."
+- **`inference.py`** — wraps the trained checkpoint. Reuses
+  `cleaning.py`/`feature_engineering.py` unchanged, applies the exact
+  per-channel feature normalization computed during training (never
+  recomputed at inference), and handles the one real subtlety: **cleaning
+  can drop points** (NaN/Inf, or outside the sensor's 0.9-120m range).
+  To keep `labels`/`confidence` the same length *and order* as the input
+  (the contract's hard requirement) without adding an `indices` field,
+  dropped points are kept in the output labeled `other_unknown` with
+  confidence `0.0` — a sentinel meaning "not a real prediction, this point
+  was filtered as sensor noise." Real-data validation shows this essentially
+  never triggers, but flagged per `interfaces.md`'s own instruction ("if
+  your model drops/filters points internally, tell me") — confirm this
+  choice with Member 4 rather than treating it as final.
+  Measured latency: ~1s/frame on GPU for a full raw ~123K-point scan (worse
+  on CPU) — the pipeline's Preprocessing stage already downsamples before
+  Segmentation in production, so real deployed latency should be well under
+  this worst case, but it's a real number for the team's real-time budget
+  discussion, not yet optimized (that's Member 6's pass, weeks 4-5).
 
 ## Training
 
 ```bash
-python train.py --data-root ../data/semantickitti/dataset --epochs 60 --val-every 5 --batch-size 8
+python train.py --data-root ../data/semantickitti/dataset
 ```
 
-- Loss: class-weighted cross-entropy (weights are inverse-sqrt-frequency,
-  estimated from a training subsample -- SemanticKITTI is heavily road-dominated,
-  plain CE would just learn to always predict `drivable`), `ignore_index=255`.
-- Mixed precision (`torch.amp`) on by default when CUDA is available.
-- `models/checkpoints/` (gitignored) holds `last.pth` (every epoch, for
-  `--resume`) and `best.pth` (highest validation mIoU so far -- this is what
-  `pointnet2.classify()` loads by default). `history.json` logs per-epoch
-  loss/mIoU for a training-curve chart in the pitch deck.
-- `--max-train-scans` / `--max-val-scans` cap dataset size for a fast sanity
-  run before committing to a multi-hour training run.
+Recipe is the handover's proposed Step 6 spec: Adam (betas 0.9/0.999),
+initial lr=1e-3, `ReduceLROnPlateau` (mode="max" on val mIoU, factor=0.5,
+patience=5, min_lr=1e-6), early stopping patience 10 validation rounds, max
+50 epochs, checkpoint = best val mIoU.
 
-## Evaluation
+- **Real class weights + per-channel feature normalization stats** are
+  computed once (from an 800-scan random sample of the actual train split —
+  a full ~19K-scan pass would cost about as much CPU time as an entire
+  training epoch for numbers that are already stable at this sample size),
+  cached to `checkpoints/dataset_stats.json`, and reused identically at
+  train/val/inference. The handover explicitly deferred this (its own
+  4-frame numbers were flagged "must NOT be reused for real training") —
+  this is that step, done for real.
+- Metrics: per-class IoU, mIoU, overall accuracy, per-class recall
+  (`metrics.py`'s `IoUMeter`) — `IGNORE_LABEL` excluded from all of them.
+- `checkpoints/` (gitignored): `last.pth` (every epoch, for `--resume`),
+  `best.pth` (highest val mIoU — includes the model weights *and* the
+  dataset stats needed to reproduce inference exactly), `history.json`,
+  `dataset_stats.json`.
+- `--max-train-scans` / `--max-val-scans` cap dataset size for a fast
+  sanity run before a real multi-hour training run.
 
-`train.py` reports **per-class IoU + overall mIoU** on the same fixed-size
-subsample used for training, every `--val-every` epochs (fast, good for
-tracking training progress) -- plus, every validation round, a slower
-**full-scan spot check** (`--full-scan-check-scans`, default 150) that runs
-the real `predict_with_propagation()` inference path on complete, untruncated
-scans. Watch for these two numbers diverging a lot; that's the density-
-sensitivity failure mode described above resurfacing.
+## `pc_benchmark_step6.py`
 
-For the final headline number, run `eval.py` -- it calls `classify()` itself
-over every scan in the val sequence, so it measures exactly what a real
-deployment would see:
+The handover's standalone CPU timing/memory benchmark (no training, no
+optimizer step) — useful for sizing batch/N on a machine without a GPU.
+`train.py`'s own steady-state numbers above are the GPU equivalent.
 
-```bash
-python eval.py --checkpoint checkpoints/best.pth --data-root ../data/semantickitti/dataset
-```
+## Next steps
 
-## Next steps (see task brief timeline)
-
-- Cross-check on nuScenes-mini's val split once it's downloaded (`data/README.md`).
-- Export `best.pth` to ONNX/TensorRT for Member 6's optimization pass (weeks 4-5).
+- Cross-check on nuScenes-mini's val split once it's downloaded.
+- Export `best.pth` to ONNX/TensorRT for Member 6's optimization pass
+  (weeks 4-5) — also the point to revisit `inference.py`'s ~1s/frame number.
