@@ -26,10 +26,25 @@ the sequence's world frame via ego_motion.py *before* calling `.update()`)
 -- for those callers, `velocity` and `velocity_relative` come out identical,
 which is the correct degenerate case, not a bug.
 """
+import os
+import sys
 from collections import deque
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared"))
+from schemas import STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE
+
+# wall/pole are static *by definition* -- SemanticKITTI (and interfaces.md's
+# class scheme) has no "moving-building"/"moving-fence"/"moving-pole"
+# equivalent, so ground truth for these classes is always static. A nonzero
+# measured velocity on a wall/pole track is therefore guaranteed to be noise
+# (partial-visibility centroid drift, DBSCAN fragment instability on
+# building-scale clusters -- see validate_semantic_kitti.py's findings),
+# never a real detection. Deciding from velocity for these classes can only
+# ever produce false positives, so skip that decision entirely.
+INHERENTLY_STATIC_CLASSES = (STATIC_OBSTACLE_WALL, STATIC_OBSTACLE_POLE)
 
 
 class KalmanTrack:
@@ -149,9 +164,12 @@ class KalmanTrack:
         return (float(self.state[2]), float(self.state[3]), 0.0)
 
     def is_dynamic(self, velocity_threshold=0.3, min_frames=10):
-        """None until enough consistent frames have been observed -- a
-        stationary object can show small apparent motion from sensor/cluster
-        noise on a single frame, so we don't decide on one frame.
+        """False immediately (never None, never velocity-derived) for
+        INHERENTLY_STATIC_CLASSES -- wall/pole have no real "moving" category
+        to begin with, so any measured velocity for one is definitionally
+        noise. Otherwise: None until enough consistent frames have been
+        observed -- a stationary object can show small apparent motion from
+        sensor/cluster noise on a single frame, so we don't decide on one frame.
 
         Averages the COMPENSATED velocity *vector* over the window (never
         the raw/relative one -- see module docstring), and over the vector
@@ -163,6 +181,8 @@ class KalmanTrack:
         speed. mean(|v_i|) would instead accumulate that noise into a false
         "average speed" that never cancels.
         """
+        if self.cls in INHERENTLY_STATIC_CLASSES:
+            return False
         if len(self.compensated_velocity_history) < min_frames:
             return None
         mean_velocity = np.mean(self.compensated_velocity_history, axis=0)
