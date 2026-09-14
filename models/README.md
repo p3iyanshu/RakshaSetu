@@ -47,21 +47,51 @@ min/epoch on the full ~19K-scan train split.
 - **`inference.py`** — wraps the trained checkpoint. Reuses
   `cleaning.py`/`feature_engineering.py` unchanged, applies the exact
   per-channel feature normalization computed during training (never
-  recomputed at inference), and handles the one real subtlety: **cleaning
-  can drop points** (NaN/Inf, or outside the sensor's 0.9-120m range).
-  To keep `labels`/`confidence` the same length *and order* as the input
-  (the contract's hard requirement) without adding an `indices` field,
-  dropped points are kept in the output labeled `other_unknown` with
-  confidence `0.0` — a sentinel meaning "not a real prediction, this point
-  was filtered as sensor noise." Real-data validation shows this essentially
-  never triggers, but flagged per `interfaces.md`'s own instruction ("if
-  your model drops/filters points internally, tell me") — confirm this
-  choice with Member 4 rather than treating it as final.
-  Measured latency: ~1s/frame on GPU for a full raw ~123K-point scan (worse
-  on CPU) — the pipeline's Preprocessing stage already downsamples before
-  Segmentation in production, so real deployed latency should be well under
-  this worst case, but it's a real number for the team's real-time budget
-  discussion, not yet optimized (that's Member 6's pass, weeks 4-5).
+  recomputed at inference), and handles two real subtleties:
+  - **cleaning can drop points** (NaN/Inf, or outside the sensor's
+    0.9-120m range). To keep `labels`/`confidence` the same length *and
+    order* as the input (the contract's hard requirement) without adding
+    an `indices` field, dropped points are kept in the output labeled
+    `other_unknown` with confidence `0.0` — a sentinel meaning "not a real
+    prediction, this point was filtered as sensor noise." Real-data
+    validation shows this essentially never triggers, but flagged per
+    `interfaces.md`'s own instruction ("if your model drops/filters points
+    internally, tell me") — confirm this choice with Member 4 rather than
+    treating it as final.
+  - **density mismatch, found 2026-09-14, since fixed**: the model is
+    trained on 8192-point frames (`dataset.py`'s class-aware sampling), but
+    a raw scan has ~100-125K points. `PointNet2SegMSG`'s Set Abstraction
+    layers sample a *fixed number* of centers per layer (1024/256/64), not
+    a fixed fraction — so at full raw density those centers represent a far
+    sparser slice of the scene, and each one's ball query captures many
+    more points within its fixed radius than the network ever trained on.
+    Measured on a real frame: full-density inference scored mIoU 0.32 with
+    `static_obstacle_pole` wildly over-predicted (47% of all points vs. 2.4%
+    actual); downsampling to 8192 points first recovered mIoU to 0.62 on the
+    same frame. `classify()` now downsamples to `MAX_INFERENCE_POINTS`
+    before the forward pass and assigns every point its nearest downsampled
+    point's prediction (`scipy.spatial.cKDTree`) — the same fix already
+    built for this project's first (retired) architecture in an earlier
+    session, never carried over when `pointnet2_seg.py` replaced it. Caught
+    because `dashboard/backend/build_demo_data.py`'s regenerated demo feed
+    looked implausible (cluster/track counts in the hundreds) — worth
+    remembering as a class of bug: a new model swapped in without re-running
+    the *specific* check that caught it the first time will reintroduce it.
+  Measured latency after the fix: ~208ms/frame on GPU for a full raw
+  ~123K-point scan (was ~1s before — downsampling first is also just less
+  compute), worse on CPU. The pipeline's Preprocessing stage already
+  downsamples before Segmentation in production, so real deployed latency
+  should be well under even this, but 208ms is the real worst-case number
+  for the team's real-time budget discussion — not yet further optimized
+  (that's Member 6's pass, weeks 4-5).
+  **Known residual gap**: `classify()` downsamples with plain uniform random
+  sampling (no ground truth to do class-aware sampling with, unlike
+  training/validation) — this under-represents rare classes like
+  `static_obstacle_pole`/`dynamic_pedestrian` more than training-time
+  sampling does, which is part of why `dashboard/backend/data/demo_sequence.json`'s
+  average per-frame mIoU (0.558) reads lower than the checkpoint's held-out
+  validation mIoU (0.868) — see that file's own `meta.note`. For the pitch,
+  the held-out validation number is the real accuracy figure.
 
 ## Training
 

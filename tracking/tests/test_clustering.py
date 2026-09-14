@@ -48,6 +48,44 @@ def test_cluster_ids_unique_across_radial_rings():
     assert ids_near.isdisjoint(ids_far)
 
 
+def test_object_straddling_ring_boundary_stays_one_cluster():
+    # corrections punch list #1: a real object whose points straddle a ring
+    # boundary must not be split into two clusters just because each half
+    # landed in a different per-ring DBSCAN call. r=5.0 is a RING_BOUNDARIES
+    # edge (Member 2's finalized 8-band set) -- this blob's points span
+    # ~4.88-5.09m, split almost evenly across it.
+    rng = np.random.default_rng(0)
+    blob = rng.normal((5.0, 0.0, 1.0), 0.05, size=(30, 3))
+    radii = np.linalg.norm(blob[:, :2], axis=1)
+    assert radii.min() < 5.0 < radii.max(), "fixture must actually straddle the boundary"
+    labels = np.full(30, STATIC_OBSTACLE_WALL)
+
+    cluster_ids = cluster_obstacles(blob, labels)
+
+    assert (cluster_ids != -1).all()
+    assert len(set(cluster_ids.tolist())) == 1, \
+        "one physical object must not be reported as two clusters just because it straddles a ring boundary"
+
+
+def test_distinct_objects_near_same_boundary_stay_separate():
+    # two different, unrelated objects that both happen to sit near the same
+    # ring boundary (but far apart angularly) must NOT get stitched together
+    # -- the boundary-radius proximity alone isn't enough, they also need to
+    # be spatially close.
+    rng = np.random.default_rng(4)
+    near_boundary = rng.normal((4.98, 0.0, 1.0), 0.01, size=(20, 3))    # just under r=5.0, angle 0
+    far_across = rng.normal((0.0, 5.02, 1.0), 0.01, size=(20, 3))        # just over r=5.0, angle 90 deg
+    points = np.concatenate([near_boundary, far_across])
+    labels = np.full(40, STATIC_OBSTACLE_WALL)
+
+    cluster_ids = cluster_obstacles(points, labels)
+
+    ids_a = set(cluster_ids[:20].tolist()) - {-1}
+    ids_b = set(cluster_ids[20:].tolist()) - {-1}
+    assert ids_a and ids_b
+    assert ids_a.isdisjoint(ids_b), "spatially far-apart objects must not be merged just for sharing a boundary radius"
+
+
 def test_extract_cluster_features_matches_known_cluster():
     rng = np.random.default_rng(3)
     pts = rng.normal((10.0, 2.0, 1.0), 0.01, size=(50, 3))

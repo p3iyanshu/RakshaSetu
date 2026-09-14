@@ -48,11 +48,14 @@ Two rules only: drop non-finite (x,y,z,intensity) points, and drop points outsid
 
 ---
 
-## 3. Open items — flagged, not yet decided
+## 3. Open items
 
-1. **`compute_class_weights()` convention**: currently implemented as `total / (num_classes * class_count)` (the standard "balanced" convention). This needs to be explicitly confirmed as acceptable before real training uses it — it was not silently finalized.
-2. **Batch size and N (points/sample)**: N=8192 is the current default but is explicitly configurable; whether 8192 is practical depends on the training hardware (see benchmark below).
-3. **Class weights and feature-normalization statistics have NOT been computed from the full dataset.** Only a 4-frame verification subset exists so far — those numbers must NOT be reused for real training; they must be recomputed from the full real train split (00–07, 09, 10) once it's available in the training environment.
+**Update (2026-09-14), post-training + corrections punch list:**
+
+1. **`compute_class_weights()` convention — RESOLVED, used as-is.** `total / (num_classes * class_count)` was used unchanged for real training; no issue surfaced.
+2. **Batch size and N (points/sample) — RESOLVED.** N=8192, batch_size=8 confirmed practical on the actual training GPU (RTX 4060 laptop), ~9-10 min/epoch after the FPS→random-sampling deadline deviation (see `PROJECT_EXECUTION_PLAN.md` v1.2 / commit `b562fdc`).
+3. **Class weights and feature-normalization statistics — RESOLVED, but this exact gap recurred once and is worth reading carefully.** First real training run used a fixed 800-scan sample (~4.2% of the 19,130-scan train split) for these stats — an improvement over the original 4-frame dev subset, but a repeat of the same category of mistake this section originally flagged, caught by a post-hoc corrections review (`team_tasks/01_data_and_segmentation_model_CORRECTIONS.md` item #1). Root cause: `compute_dataset_stats()` looped single-threaded, so a full-dataset pass cost as much wall time as a training epoch — that's why 800 was the default, not a considered statistical decision. Fixed by parallelizing it with a `DataLoader`/`num_workers` (commit `fbe4761`), making the full 19,130-scan split affordable (~7.5 min instead of ~30), then recomputing stats from it and fine-tuning (not retraining from scratch) from the existing checkpoint with the corrected weights. Concretely: `dynamic_pedestrian`'s class weight moved from 26.75 (800-scan estimate) to **32.64** (full-dataset) — confirming the small sample had underestimated just how rare that safety-critical class actually is. Resulting checkpoint: mIoU improved **0.8527 → 0.8675**, and `dynamic_pedestrian` IoU specifically improved **0.689 → 0.729** (see §5 below for the full per-class table). **Lesson for whoever touches this next:** any "compute stats/metrics from a sample because the full pass is slow" shortcut should be re-examined once more compute time is available, by default — it's an easy gap to reintroduce without meaning to.
+4. **nuScenes-mini / CARLA cross-check — explicitly descoped for the 2026-09-16 internal hackathon**, per corrections item #3. Decision confirmed 2026-09-14: SemanticKITTI-only for this milestone; nuScenes-mini/CARLA generalization cross-check to be picked up after, not silently dropped. `data/class_mapping.py`'s `NUSCENES_NAME_MAP`/`CARLA_MAP` remain as unreviewed mapping-table stubs for when that work resumes.
 
 ---
 
@@ -139,3 +142,76 @@ RakshaSetu_Member1_Handover/
 ## 8. One-line summary you can put in your message to him
 
 "Steps 1–5 (label remapping, cleaning, feature engineering, dataset/dataloader, PointNet++ model) are done and verified on real data — model architecture and loss are confirmed working end-to-end with finite gradients, but **no training has happened yet**. You're picking up at Step 6: get the full SemanticKITTI train/val split into your environment, run the included benchmark to size batch/N for your hardware, compute real class weights + normalization stats from the full split, then train. Sample data (4 frames) and all code are in the drive folder; full dataset you'll need to source separately."
+
+---
+
+## 9. Step 6 update (2026-09-14) — training complete, corrections applied
+
+Sections 4–8 above are Khushi's original handover, written before Step 6
+started — kept as-is for the record. This section is the actual outcome.
+
+**Full real training run**, on the complete 54GB extracted dataset
+(19,130 train / 4,071 val scans, sequences 00–07,09,10 / 08):
+
+- A same-day demo deadline forced one architecture deviation: `farthest_point_sample`
+  swapped from true FPS to random sampling (~11x faster per step) — see
+  `PROJECT_EXECUTION_PLAN.md` v1.2 and commit `b562fdc`. Documented as
+  time-boxed, to revisit post-deadline, not a permanent decision.
+- First training pass used class weights/normalization stats from only an
+  800-scan sample (~4.2% of train) — caught by a post-hoc corrections
+  review (`team_tasks/01_data_and_segmentation_model_CORRECTIONS.md`) as a
+  recurrence of the exact gap §3 originally flagged. Fixed by parallelizing
+  `compute_dataset_stats()` and recomputing from the **full** 19,130-scan
+  train split, then fine-tuning (not retraining from scratch) with the
+  corrected weights.
+
+**Final checkpoint (`models/checkpoints/best.pth`) — val on sequence 08:**
+
+| Class | IoU | Recall |
+|---|---|---|
+| drivable_terrain | 0.934 | 0.967 |
+| static_obstacle_wall | 0.877 | 0.944 |
+| static_obstacle_pole | 0.891 | 0.944 |
+| dynamic_vehicle | 0.950 | 0.971 |
+| dynamic_pedestrian | 0.729 | 0.884 |
+| other_unknown | 0.823 | 0.893 |
+| **mIoU** | **0.868** | |
+| **Overall accuracy** | | **0.942** |
+
+`dynamic_pedestrian` — the class the corrections review specifically
+flagged as weakest (0.65 IoU on the 800-scan-stats checkpoint) — improved to
+0.729 IoU after recomputing stats from the full train split (class weight
+moved from 26.75 to the full-dataset-true 32.64). It remains the weakest of
+the six classes, which is expected given it's the rarest by far (~40k of
+~5.5M valid points in the full-stats sample) — stated honestly here rather
+than chased further under deadline pressure, per the corrections review's
+own guidance.
+
+**Verified**: `pytest tests/test_contracts.py tracking/tests/ -v` — 19/19
+passing, including the real trained-checkpoint contract test.
+
+**A second real bug found and fixed the same day, while regenerating the
+dashboard demo feed against this checkpoint**: `models/inference.py` was
+running the model on full raw scans (~100-125K points) directly, but
+`PointNet2SegMSG` is trained on 8192-point frames — its Set Abstraction
+layers sample a *fixed number* of centers per layer regardless of input
+size, so at full density those centers represented a far sparser slice of
+the scene than in training, a real distribution shift (measured: mIoU 0.32
+on a full-density frame, with `static_obstacle_pole` over-predicted at 47%
+vs. 2.4% actual). This is the identical class of bug this project's first,
+now-retired segmentation architecture had already found and fixed — the fix
+didn't carry over when `pointnet2_seg.py` replaced it. Re-applied the same
+downsample-then-propagate strategy; recovered to mIoU 0.62 on the same
+frame, and ~5x faster as a side effect. See `models/README.md` and commit
+`659b58b`. `dashboard/backend/data/demo_sequence.json` regenerated with the
+fix — its own `meta.note` field explains why that clip's avg per-frame mIoU
+(0.558) still reads below this checkpoint's held-out validation mIoU
+(0.868): `classify()` has no ground truth to sample by class with at
+inference, unlike training/validation.
+
+**nuScenes-mini / CARLA generalization cross-check**: explicitly descoped
+for the 2026-09-16 internal hackathon (decision recorded 2026-09-14, §3
+item 4) — SemanticKITTI-only for this milestone.
+
+**`.onnx` export**: still open, as originally scoped — Member 6's
+optimization pass, weeks 4-5, not overdue.

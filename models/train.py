@@ -25,7 +25,7 @@ import time
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))
@@ -39,29 +39,40 @@ CKPT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints
 STATS_PATH = os.path.join(CKPT_DIR, "dataset_stats.json")
 
 
-def compute_dataset_stats(dataset, n_samples, num_classes, seed=0):
+def compute_dataset_stats(dataset, n_samples, num_classes, seed=0, num_workers=4, batch_size=8):
     """Real class weights + per-channel feature mean/std, from a random sample
     of frames drawn from the ACTUAL train split (not the 4-frame dev subset
-    the handover explicitly says not to reuse). Also returns the raw class
-    counts (diagnostic) and the number of scans/points the sample covered.
+    the handover explicitly says not to reuse, nor an 800-scan/4.2% sample --
+    see Member1_HANDOVER_REPORT.md's open item #1 and the corrections punch
+    list item #1 this addresses). Also returns the raw class counts
+    (diagnostic) and the number of scans/points the sample covered.
 
-    A full pass over every one of ~19k train scans just for statistics would
-    cost about as much CPU time as one training epoch, for numbers that
-    stabilize with far fewer samples -- n_samples defaults to a few hundred
-    scans (~millions of points), which is enough for stable mean/std/weights.
+    Runs via a DataLoader with num_workers so a full-dataset pass (all
+    ~19k train scans) is practical -- a naive single-threaded loop over
+    every scan would cost about as much wall time as a full training epoch;
+    parallelizing across workers (the same ones training itself uses) cuts
+    that by roughly num_workers, making "the full set" affordable instead of
+    settling for a small sample purely to save time.
     """
     rng = np.random.default_rng(seed)
-    idxs = rng.choice(len(dataset), size=min(n_samples, len(dataset)), replace=False)
+    n = min(n_samples, len(dataset))
+    if n < len(dataset):
+        idxs = rng.choice(len(dataset), size=n, replace=False)
+        subset = Subset(dataset, idxs.tolist())
+    else:
+        subset = dataset
+
+    loader = DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     all_labels = []
     feat_sum = torch.zeros(len(FEATURE_NAMES), dtype=torch.float64)
     feat_sumsq = torch.zeros(len(FEATURE_NAMES), dtype=torch.float64)
     n_points = 0
 
-    for i in idxs:
-        item = dataset[int(i)]
-        all_labels.append(item["labels"])
-        feats = item["features"].double()
+    for batch in loader:
+        labels = batch["labels"].reshape(-1)
+        all_labels.append(labels)
+        feats = batch["features"].reshape(-1, len(FEATURE_NAMES)).double()
         feat_sum += feats.sum(dim=0)
         feat_sumsq += (feats ** 2).sum(dim=0)
         n_points += feats.shape[0]
@@ -82,7 +93,7 @@ def compute_dataset_stats(dataset, n_samples, num_classes, seed=0):
         "feature_mean": mean.tolist(),
         "feature_std": std.tolist(),
         "feature_names": FEATURE_NAMES,
-        "n_scans_sampled": int(len(idxs)),
+        "n_scans_sampled": int(n),
         "n_points_sampled": int(n_points),
     }
 
@@ -158,7 +169,8 @@ def main():
         print(f"loaded cached dataset stats from {STATS_PATH} ({stats['n_scans_sampled']} scans, {stats['n_points_sampled']:,} points)")
     else:
         print(f"computing class weights + feature normalization stats from {args.stats_sample_scans} real train scans...")
-        stats = compute_dataset_stats(train_ds, args.stats_sample_scans, NUM_CLASSES)
+        stats = compute_dataset_stats(train_ds, args.stats_sample_scans, NUM_CLASSES,
+                                       num_workers=args.num_workers, batch_size=args.batch_size)
         with open(STATS_PATH, "w") as f:
             json.dump(stats, f, indent=2)
         print(f"saved dataset stats to {STATS_PATH}")

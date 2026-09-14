@@ -23,6 +23,27 @@ filtered as sensor noise/corruption", not a genuine classification. Real-data
 validation (cleaning.py's docstring) found this essentially never triggers
 on real KITTI data, but the contract must hold even in the rare case it does.
 This choice should be confirmed with Member 4 rather than assumed final.
+
+CRITICAL -- density mismatch (found 2026-09-14 while regenerating the
+dashboard demo feed, before this fix was in place): the model is trained on
+frames reduced to a fixed 8192 points (dataset.py's class-aware sampling),
+but a real raw scan has ~100k-125k points. Even with ball query (a fixed
+PHYSICAL radius, not k-nearest-neighbors) making each neighborhood's *extent*
+density-independent, PointNet2SegMSG's Set Abstraction layers still sample a
+FIXED NUMBER of centers per layer (1024/256/64), not a fixed fraction -- so
+at full raw density, those same 1024 first-layer centers end up representing
+a much SPARSER slice of the scene, and each center's ball query captures far
+MORE points within its fixed radius than the network ever saw during
+training. Measured on a real training-set frame: feeding the full ~115k
+points directly scored mIoU 0.32 with static_obstacle_pole wildly
+over-predicted (47% of all points, vs. 2.4% actual) -- subsampling that same
+frame to 8192 points (matching training density) before inference recovered
+mIoU to 0.62 on the same frame, with pole collapsing back to a realistic
+0.4%. So classify() downsamples to MAX_INFERENCE_POINTS before the forward
+pass and assigns every original point its nearest downsampled point's
+prediction (scipy cKDTree) -- the same fix already applied to this project's
+first (now-retired) segmentation architecture, never carried over when this
+one replaced it.
 """
 import os
 import sys
@@ -30,6 +51,7 @@ import sys
 import numpy as np
 import torch
 import torch.nn.functional as F
+from scipy.spatial import cKDTree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))
@@ -40,6 +62,7 @@ from pointnet2_seg import PointNet2SegMSG, NUM_CLASSES
 
 OTHER_UNKNOWN = 5  # sentinel label for points cleaning dropped -- see module docstring
 DEFAULT_CHECKPOINT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints", "best.pth")
+MAX_INFERENCE_POINTS = 8192  # must match train.py's --num-points (the density the model was trained at)
 
 _MODEL = None
 _DEVICE = None
@@ -93,16 +116,31 @@ def classify(points: np.ndarray, checkpoint_path: str = DEFAULT_CHECKPOINT, devi
         feats_dict, _ = compute_features(clean_points)
         feats = np.stack([feats_dict[name] for name in FEATURE_NAMES], axis=1).astype(np.float32)
 
+        m = len(clean_points)
+        if m > MAX_INFERENCE_POINTS:
+            infer_idx = np.random.default_rng().choice(m, MAX_INFERENCE_POINTS, replace=False)
+        else:
+            infer_idx = np.arange(m)
+        infer_xyz = clean_points[infer_idx, :3]
+        infer_feats = feats[infer_idx]
+
         with torch.no_grad():
-            xyz_t = torch.from_numpy(clean_points[:, :3]).unsqueeze(0).to(dev)
-            feat_t = torch.from_numpy(feats).unsqueeze(0).to(dev)
+            xyz_t = torch.from_numpy(infer_xyz).unsqueeze(0).to(dev)
+            feat_t = torch.from_numpy(infer_feats).unsqueeze(0).to(dev)
             feat_t = (feat_t - feat_mean) / feat_std
             logits = model(xyz_t, feat_t)
             probs = F.softmax(logits, dim=-1)
             conf, pred = probs.max(dim=-1)
+        pred = pred.squeeze(0).cpu().numpy()
+        conf = conf.squeeze(0).cpu().numpy()
 
-        labels[keep_mask] = pred.squeeze(0).cpu().numpy()
-        confidence[keep_mask] = conf.squeeze(0).cpu().numpy()
+        if m > MAX_INFERENCE_POINTS:
+            # every cleaned point inherits its nearest downsampled point's prediction
+            nn_idx = cKDTree(infer_xyz).query(clean_points[:, :3], k=1)[1]
+            pred, conf = pred[nn_idx], conf[nn_idx]
+
+        labels[keep_mask] = pred
+        confidence[keep_mask] = conf
 
     return labels.astype(np.uint8), confidence
 

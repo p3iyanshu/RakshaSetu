@@ -27,13 +27,12 @@ SemanticKITTI raw-id mapping: data/label_remap.py's RAW_TO_RAKSHASETU (see
 Member1_HANDOVER_REPORT.md). It disagrees with the (unreviewed) table below
 on 7 raw ids -- notably sidewalk/other-ground/terrain (drivable here vs.
 other_unknown there) and bicyclist/moving-bicyclist (dynamic_pedestrian here
-vs. dynamic_vehicle there). SEMANTICKITTI_MAP is kept here ONLY because
-tracking/semantic_kitti_labels.py still imports it -- that import should be
-switched to label_remap.py's RAW_TO_RAKSHASETU for consistency with the
-actual trained model, but that's Member 3's module to update, not something
-to silently change from here. Flag this to the team rather than assuming
-either table is correct. NUSCENES_NAME_MAP and CARLA_MAP below are unaffected
-(no equivalent approved table exists for those sources yet).
+vs. dynamic_vehicle there). tracking/semantic_kitti_labels.py has been
+switched to import label_remap.py's RAW_TO_RAKSHASETU instead, for
+consistency with the actual trained model -- SEMANTICKITTI_MAP below is now
+unused by any other module and kept only for historical reference; do not
+reintroduce a new import of it. NUSCENES_NAME_MAP and CARLA_MAP below are
+unaffected (no equivalent approved table exists for those sources yet).
 """
 import numpy as np
 

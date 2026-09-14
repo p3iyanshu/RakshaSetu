@@ -1,35 +1,39 @@
 """
 Offline precompute: runs the REAL trained PointNet++ segmentation model
-(models/pointnet2.py) and the REAL clustering + tracking pipeline
-(tracking/clustering.py, tracking/kalman_tracker.py) over the already
-extracted SemanticKITTI demo window
-(tracking/kitti_validation_data/sequences/00, frames 3615-3714), and
+(models/pointnet2_seg.py, via models/inference.py's classify()) and the REAL
+clustering + tracking pipeline (tracking/clustering.py,
+tracking/kalman_tracker.py) over the already extracted SemanticKITTI demo
+window (tracking/kitti_validation_data/sequences/00, frames 3615-3714), and
 serializes every frame's grid + tracked objects + metrics to
 dashboard/backend/data/demo_sequence.json for dashboard/backend/main.py's
 real_feed.py to replay over the WebSocket.
 
 No fabricated numbers. Every field either comes from actually running
-models/pointnet2.classify() / tracking's clustering+tracker against real
-data, or is an analytically-derived constant computed from the
-RING_BOUNDARIES grid geometry (compute_savings_pct -- see the formula
-comment on _naive_uniform_cell_count() below, since that's a headline
-number for judges).
+inference.classify() / tracking's clustering+tracker against real data, or
+is an analytically-derived constant computed from the RING_BOUNDARIES grid
+geometry (compute_savings_pct -- see the formula comment on
+_naive_uniform_cell_count() below, since that's a headline number for judges).
 
 v2 (2026-09-12): shared/schemas.py's class scheme moved from 3 classes to 6
 (drivable/static_obstacle_wall/static_obstacle_pole/dynamic_vehicle/
 dynamic_pedestrian/other_unknown) per Member 4's ros2_ws/interfaces.md v2.
-This script's own logic didn't need to change beyond its clustering.py
-import (it never hardcoded the old class count), but the CHECKPOINT below
-was trained under the OLD 3-class head and will now fail to load (output
-layer shape mismatch) until Member 1 retrains under the new 6-class scheme
--- re-run this script only after that retrain. This module's own grid-cell
-dicts still use the field name "ring" (not interfaces.md's "range_bin") and
-a flat list-of-cells shape (not interfaces.md's string-keyed dict) -- this
-was a pragmatic, independent format built to demo before ros2_ws/ existed
-at all (see team_tasks/05_dashboard_visualization.md: "you do not need to
-wait for the real pipeline"), and should be reconciled with interfaces.md
-once this dashboard actually consumes Member 4's real Fusion node output
-instead of this offline precompute.
+This module's own grid-cell dicts still use the field name "ring" (not
+interfaces.md's "range_bin") and a flat list-of-cells shape (not
+interfaces.md's string-keyed dict) -- this was a pragmatic, independent
+format built to demo before ros2_ws/ existed at all (see
+team_tasks/05_dashboard_visualization.md: "you do not need to wait for the
+real pipeline"), and should be reconciled with interfaces.md once this
+dashboard actually consumes Member 4's real Fusion node output instead of
+this offline precompute.
+
+2026-09-14 update: retrained under the 6-class scheme (mIoU 0.868, see
+Member1_HANDOVER_REPORT.md section 9) and the segmentation module itself was
+rebuilt in the process -- models/pointnet2.py no longer exists (replaced by
+models/pointnet2_seg.py + models/inference.py's classify()), and
+models/metrics.py's IoUMeter.compute() now returns a single dict
+({"miou": ..., "per_class_iou": ..., ...}) instead of a (per_class, miou)
+tuple. Updated both call sites below accordingly -- no other logic in this
+script needed to change.
 
 Run (from repo root or anywhere -- paths are absolute):
     python dashboard/backend/build_demo_data.py
@@ -46,7 +50,7 @@ import torch
 
 # ---------------------------------------------------------------------------
 # Path setup. This repo has no __init__.py packages -- every existing module
-# (models/pointnet2.py, tracking/*.py) already assumes a flat sys.path with
+# (models/inference.py, tracking/*.py) already assumes a flat sys.path with
 # its own directory on it, so we follow the same convention rather than
 # inventing a package layout.
 # ---------------------------------------------------------------------------
@@ -55,7 +59,7 @@ REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 for _sub in ("models", "tracking", "shared", "data"):
     sys.path.insert(0, os.path.join(REPO_ROOT, _sub))
 
-import pointnet2                                       # models/pointnet2.py
+import inference                                       # models/inference.py -- classify(), wraps PointNet2SegMSG
 from metrics import IoUMeter                            # models/metrics.py
 from schemas import RING_BOUNDARIES, DRIVABLE            # shared/schemas.py
 from clustering import cluster_obstacles, extract_cluster_features, OBSTACLE_CLASSES  # tracking/clustering.py
@@ -224,7 +228,7 @@ def main():
     # timed/reported frames.
     print("warming up model...")
     warm_dummy = np.random.rand(20000, 4).astype(np.float32)
-    pointnet2.classify(warm_dummy, checkpoint_path=CHECKPOINT, device=device)
+    inference.classify(warm_dummy, checkpoint_path=CHECKPOINT, device=device)
 
     overall_iou = IoUMeter()
     frames_out = []
@@ -239,7 +243,7 @@ def main():
 
         # --- 1. real segmentation inference, real measured latency ---
         t_start = time.perf_counter()
-        labels_pred, conf_pred = pointnet2.classify(points, checkpoint_path=CHECKPOINT, device=device)
+        labels_pred, conf_pred = inference.classify(points, checkpoint_path=CHECKPOINT, device=device)
         t_end = time.perf_counter()
         latency_ms = (t_end - t_start) * 1000.0
         fps = 1000.0 / latency_ms if latency_ms > 0 else 0.0
@@ -250,7 +254,7 @@ def main():
         gt_t = torch.from_numpy(gt_simplified.astype(np.int64))
         frame_meter = IoUMeter()
         frame_meter.update(pred_t, gt_t)
-        _, frame_miou = frame_meter.compute()
+        frame_miou = frame_meter.compute()["miou"]
         overall_iou.update(pred_t, gt_t)  # accumulated across the whole run, for the summary
 
         # --- 3. adaptive grid, binned in the SENSOR frame from real points/predictions ---
@@ -264,11 +268,14 @@ def main():
 
         # min_samples raised from clustering.py's default (5) to 20 for this
         # demo build only (passed as an override, clustering.py itself is
-        # untouched): the 2-epoch checkpoint over-predicts static_obstacle
-        # on real scans (see mIoU ~0.66 and ~140 raw clusters/frame observed
-        # here vs. a handful of real cars/poles/pedestrians in this scene),
-        # so a low density threshold turns sparse misclassification noise
-        # into hundreds of spurious "objects". Requiring more points before
+        # untouched). Updated 2026-09-14: with the final trained checkpoint
+        # (mIoU 0.868 held-out val) this is no longer compensating for an
+        # undertrained model -- even a well-trained model produces some
+        # per-point classification noise, and this demo window is a dense
+        # urban street scene where continuous building/wall facades naturally
+        # fragment into many small DBSCAN clusters regardless of model
+        # quality (40-100+ raw clusters/frame observed here vs. a handful of
+        # real cars/poles/pedestrians). Requiring more points before
         # something counts as a discrete cluster is a standard, honest
         # perception-stack noise filter (not massaging results) -- it costs
         # some sensitivity to genuinely sparse far-range detections in
@@ -291,9 +298,9 @@ def main():
         # shape instead: a
         # real car is ~5m long, a pedestrian <1m -- an 8m bbox diagonal is a
         # generous upper bound that keeps every vehicle-scale object and
-        # drops wall/building/vegetation fragments (which are undertrained-
-        # model noise given the 2-epoch checkpoint's low drivable/obstacle
-        # precision, not real hazards worth showing a reviewer as "objects").
+        # drops wall/building/vegetation fragments (real extended structures,
+        # not model noise -- see the min_samples note above -- but still not
+        # discrete "objects" worth showing a reviewer as tracked hazards).
         MAX_OBJECT_DIAGONAL_M = 8.0
         clusters = [
             c for c in clusters
@@ -354,22 +361,43 @@ def main():
               f"tracks={len(tracked_objects):3d} dynamic={'Y' if has_dynamic else '.'}")
 
     run_elapsed = time.time() - run_start
-    _, overall_miou = overall_iou.compute()
+    overall_miou = overall_iou.compute()["miou"]
+
+    # Read the checkpoint's own recorded epoch/mIoU rather than hardcoding a
+    # string here -- the previous version of this file said "25 epochs
+    # trained, val mIoU 0.809" long after the actual checkpoint had moved on
+    # (final: epoch 16, val mIoU 0.8675, see Member1_HANDOVER_REPORT.md
+    # section 9), and nothing would have caught that drift.
+    ckpt_meta = torch.load(CHECKPOINT, map_location="cpu")
+    checkpoint_desc = (
+        f"models/checkpoints/best.pth (epoch {ckpt_meta.get('epoch', '?')}, "
+        f"val mIoU {ckpt_meta.get('miou', float('nan')):.4f})"
+    )
+
+    avg_latency = float(np.mean(latencies))
+    avg_fps = float(np.mean(fps_list))
+    avg_miou = float(np.mean(mious))
 
     meta = {
         "source": "SemanticKITTI seq 00, frames 3615-3714 (real data)",
-        "checkpoint": "models/checkpoints/best.pth (25 epochs trained, val mIoU 0.809)",
+        "checkpoint": checkpoint_desc,
         "num_frames": n_frames,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "note": (
+            f"avg per-frame mIoU on this specific 100-frame window is {avg_miou:.3f}, "
+            f"notably below the checkpoint's held-out validation mIoU (see 'checkpoint' "
+            f"above) -- this window uses uniform random downsampling at inference "
+            f"(inference.classify() has no ground truth to do class-aware sampling "
+            f"with, unlike train.py's validation), which under-represents rare classes "
+            f"like static_obstacle_pole/dynamic_pedestrian more than the reported "
+            f"validation number does. For the pitch, cite the held-out validation mIoU "
+            f"as the model's real accuracy figure, not this demo clip's average."
+        ),
     }
     out = {"meta": meta, "frames": frames_out}
 
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         json.dump(out, f)
-
-    avg_latency = float(np.mean(latencies))
-    avg_fps = float(np.mean(fps_list))
-    avg_miou = float(np.mean(mious))
 
     print("\n==== SUMMARY ====")
     print(f"frames processed: {n_frames}  (wall time for full precompute: {run_elapsed:.1f}s)")
