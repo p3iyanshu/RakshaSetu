@@ -1,18 +1,14 @@
 import { useEffect, useRef } from "react";
-import { RING_BOUNDARIES, MAX_RANGE_M } from "../lib/constants.js";
-import { CLASS_COLOR, rgba } from "../lib/colors.js";
+import { RING_BOUNDARIES } from "../lib/constants.js";
+import { rgba } from "../lib/colors.js";
+import { FOV_DEG, FORWARD_RANGE_M, makeForwardProjector } from "../lib/live/forwardProjection.js";
 
-// How wide a windshield/forward-camera field of view to render. Cells and
-// objects outside this heading range (or behind the vehicle) simply aren't
-// part of a forward HUD's job -- they're still fully visible on the admin
-// console's 360-degree top-down radar, nothing is hidden from the system,
-// just from this particular real-world-analogous view.
-const FOV_DEG = 78;
-const FORWARD_RANGE_M = 80; // draw distance -- SemanticKITTI's own useful range
+const DRIVABLE_COLOR = "#4ac26b";
+const NON_DRIVABLE_COLOR = "#8a7752"; // tan/khaki shoulder terrain
 
 /** Closest real tracked object ahead of the vehicle and inside the
  * windshield FOV, for the HUD's proximity alert -- shared with CarView so
- * the alert text matches exactly what's drawn on the canvas. */
+ * the alert text matches exactly what's drawn on screen. */
 export function nearestAheadHazard(objects = []) {
   let nearest = null;
   for (const obj of objects) {
@@ -27,16 +23,15 @@ export function nearestAheadHazard(objects = []) {
 }
 
 /**
- * Forward-perspective "windshield" HUD, matching the RakshaSetu Console
- * reference's instrument-cluster visual metaphor -- but every wedge and
- * marker here is a real projection of the live grid/object data, not an
- * illustrative animation. A cell at (ring, angular_bin) has a genuine
- * (radius, heading) in the vehicle frame; heading=0 is straight ahead
- * (matches PolarGrid's angular_bin*10-degrees-clockwise-from-heading
- * convention). We project (radius, heading) to screen space with the same
- * near-large/far-small vanishing-point math a real forward camera has.
+ * Forward-perspective "windshield" terrain surface: just the drivable/
+ * non-drivable ground and motion trails, using genuine (radius, heading)
+ * projections of the live grid -- nothing here is illustrative. Discrete
+ * obstacles (walls, poles, vehicles, humans, potholes...) are rendered as
+ * DOM icon overlays by the view (see VehicleHudView + SemanticMarker), the
+ * same terrain/icon split components/live/ already uses for the Live scene,
+ * so this canvas only ever draws the ground itself.
  */
-export default function WindshieldView({ cells, objects = [], trails = new Map(), width = 800, height = 480, background = "#0a1213" }) {
+export default function WindshieldView({ cells, trails = new Map(), objects = [], width = 800, height = 480, background = "#0a1213" }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -55,33 +50,11 @@ export default function WindshieldView({ cells, objects = [], trails = new Map()
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, width, height);
 
-    const w = width;
-    const h = height;
-    const carY = h * 0.92;
+    const { project, inFov } = makeForwardProjector(width, height);
 
-    // project(radiusM, headingDeg) -> {x, y, scale}. headingDeg: 0 = ahead,
-    // +ve = clockwise (right), matches the grid's own angular_bin convention.
-    function project(radiusM, headingDeg) {
-      const t = Math.max(0, Math.min(1, radiusM / FORWARD_RANGE_M));
-      const y = carY - t * h * 0.82;
-      const perspective = 0.4 + t * 0.6;
-      const xNorm = Math.sin((headingDeg * Math.PI) / 180);
-      const x = w / 2 + xNorm * w * 0.62 * perspective;
-      return { x, y, scale: 1 - t * 0.62, t };
-    }
-
-    function inFov(headingDeg) {
-      const d = ((headingDeg + 180) % 360) - 180; // normalize to [-180,180]
-      return Math.abs(d) <= FOV_DEG;
-    }
-    function normDeg(headingDeg) {
-      return ((headingDeg + 180) % 360) - 180;
-    }
-
-    // faint horizon/lane guide lines for depth cues, matching the
-    // reference's cluster stage -- three guide rays fanning from the
-    // vehicle, not data, purely a perspective reference grid.
-    ctx.strokeStyle = "rgba(60,203,232,0.07)";
+    // Faint horizon/lane guide lines for depth cues -- a perspective
+    // reference grid, not data.
+    ctx.strokeStyle = "rgba(220,233,231,0.06)";
     ctx.lineWidth = 1;
     [-FOV_DEG, -FOV_DEG / 2, 0, FOV_DEG / 2, FOV_DEG].forEach((deg) => {
       const near = project(0.5, deg);
@@ -104,8 +77,10 @@ export default function WindshieldView({ cells, objects = [], trails = new Map()
       ctx.stroke();
     }
 
-    // Real grid cells, drawn as forward-projected quads -- the actual
-    // segmented terrain/obstacle surface, not a stylized ribbon.
+    // Real grid cells, drawn as forward-projected terrain quads: drivable
+    // reads as road green, anything else (wall/pole/vehicle/human/unknown)
+    // reads as non-drivable shoulder tan -- the discrete obstacle type is
+    // conveyed by the icon overlay on top, not by ground color.
     if (cells && cells.length) {
       for (const cell of cells) {
         const heading = normDeg(cell.angular_bin * 10);
@@ -122,9 +97,10 @@ export default function WindshieldView({ cells, objects = [], trails = new Map()
         const far1 = project(r1, a1);
         const far0 = project(r1, a0);
 
-        const color = (CLASS_COLOR[cell.cls] || CLASS_COLOR[0]).base;
+        const isDrivable = cell.cls === 0;
+        const color = isDrivable ? DRIVABLE_COLOR : NON_DRIVABLE_COLOR;
         const conf = typeof cell.confidence === "number" ? cell.confidence : 0.8;
-        const alpha = cell.cls === 0 ? 0.08 + conf * 0.2 : 0.32 + conf * 0.3;
+        const alpha = isDrivable ? 0.35 + conf * 0.25 : 0.5 + conf * 0.3;
 
         ctx.beginPath();
         ctx.moveTo(near0.x, near0.y);
@@ -137,11 +113,22 @@ export default function WindshieldView({ cells, objects = [], trails = new Map()
       }
     }
 
-    // Motion trails, projected the same way.
+    // Lane-center dashed guide down the middle of the drivable lane.
+    ctx.setLineDash([10, 10]);
+    ctx.strokeStyle = "rgba(220,233,231,0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const laneNear = project(0.5, 0);
+    const laneFar = project(FORWARD_RANGE_M, 0);
+    ctx.moveTo(laneNear.x, laneNear.y);
+    ctx.lineTo(laneFar.x, laneFar.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Motion trails, projected the same way as icons will be.
     for (const obj of objects) {
       const trail = trails.get(obj.track_id);
       if (!trail || trail.length < 2) continue;
-      const color = (CLASS_COLOR[obj.cls] || CLASS_COLOR[5]).base; // 5 = "unclassified" fallback for an unrecognized cls
       for (let i = 1; i < trail.length; i++) {
         const [fx0, fy0] = trail[i - 1];
         const [fx1, fy1] = trail[i];
@@ -151,52 +138,17 @@ export default function WindshieldView({ cells, objects = [], trails = new Map()
         ctx.beginPath();
         ctx.moveTo(p0.x, p0.y);
         ctx.lineTo(p1.x, p1.y);
-        ctx.strokeStyle = rgba(color, (i / trail.length) * 0.5);
+        ctx.strokeStyle = rgba("#e2a23b", (i / trail.length) * 0.4);
         ctx.lineWidth = 2.5;
         ctx.lineCap = "round";
         ctx.stroke();
       }
     }
-
-    // Real tracked objects -- projected with genuine near-large/far-small
-    // perspective scale, so distance reads visually the way it would
-    // through an actual windshield.
-    for (const obj of objects) {
-      const [fx, fy] = obj.position;
-      if (fx <= 0) continue; // behind the vehicle -- not this view's job
-      const heading = (Math.atan2(fy, fx) * 180) / Math.PI;
-      if (!inFov(heading)) continue;
-      const dist = Math.hypot(fx, fy);
-      const p = project(dist, heading);
-      const color = (CLASS_COLOR[obj.cls] || CLASS_COLOR[5]).base; // 5 = "unclassified" fallback for an unrecognized cls
-      const r = Math.max(3, 8 * p.scale);
-
-      ctx.beginPath();
-      if (obj.is_dynamic) {
-        ctx.moveTo(p.x, p.y - r);
-        ctx.lineTo(p.x + r, p.y);
-        ctx.lineTo(p.x, p.y + r);
-        ctx.lineTo(p.x - r, p.y);
-        ctx.closePath();
-      } else {
-        ctx.arc(p.x, p.y, r * 0.8, 0, Math.PI * 2);
-      }
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = background;
-      ctx.stroke();
-    }
-
-    // Ego hood reference marker.
-    ctx.beginPath();
-    ctx.moveTo(w / 2, carY - 10);
-    ctx.lineTo(w / 2 + 16, carY + 8);
-    ctx.lineTo(w / 2 - 16, carY + 8);
-    ctx.closePath();
-    ctx.fillStyle = "rgba(220,233,231,0.9)";
-    ctx.fill();
   }, [cells, objects, trails, width, height, background]);
 
   return <canvas ref={canvasRef} className="block" />;
+}
+
+function normDeg(headingDeg) {
+  return ((headingDeg + 180) % 360) - 180;
 }

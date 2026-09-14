@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { login } from "../lib/auth.js";
 
 /**
- * Gate in front of both consoles. Demo credentials live in
+ * Gate in front of the dashboard. Demo credentials live in
  * security/auth.py (admin/admin123, viewer/viewer123 by default) -- see
  * security/README.md to override them before showing this outside the team.
  */
@@ -15,7 +15,7 @@ export default function LoginView() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const redirectTo = location.state?.from ?? "/car";
+  const redirectTo = location.state?.from ?? "/dashboard/lidar";
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -49,7 +49,7 @@ export default function LoginView() {
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-display font-bold text-[17px] tracking-[0.06em] text-[var(--ink)]">RAKSHASETU</span>
-            <span className="font-mono text-[10px] tracking-wide text-[var(--ink-dim)] uppercase">Console access</span>
+            <span className="font-mono text-[10px] tracking-wide text-[var(--ink-dim)] uppercase">Dashboard access</span>
           </div>
         </div>
 

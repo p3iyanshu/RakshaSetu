@@ -17,6 +17,8 @@ import math
 import random
 from datetime import datetime, timezone
 
+import psutil
+
 # Class ids match shared/schemas.py's v2 6-class scheme (2026-09-12) --
 # kept as plain int constants here rather than an import, since this
 # generator is deliberately standalone (usable before the rest of the
@@ -27,6 +29,18 @@ STATIC_POLE = 2
 DYNAMIC_VEHICLE = 3
 DYNAMIC_PEDESTRIAN = 4
 OTHER_UNKNOWN = 5
+
+# Deterministic ego path the generator drives itself along each tick:
+# straight -> curve (a 90-degree turn) -> straight, looping back to the
+# start. Dashboard-backend-only for now (not in shared/schemas.py) --
+# reconciled with Member 4's real odometry later, same pattern the README
+# already uses for the ring/range_bin naming mismatch.
+EGO_STRAIGHT1_M = 40.0
+EGO_CURVE_ARC_M = 18.0
+EGO_STRAIGHT2_M = 40.0
+EGO_CURVE_TURN_DEG = 90.0
+EGO_LOOP_LEN_M = EGO_STRAIGHT1_M + EGO_CURVE_ARC_M + EGO_STRAIGHT2_M
+EGO_BASE_SPEED_MPS = 5.0
 
 NUM_RINGS = 4
 BINS_PER_RING = 36
@@ -79,6 +93,13 @@ class MockFeedGenerator:
         # short position history per track_id for motion trails
         self.trails = {o["track_id"]: [] for o in self.objects}
 
+        # ego vehicle's own driven pose -- see EGO_* constants above
+        self.ego_dist = 0.0
+        self.ego_x = 0.0
+        self.ego_y = 0.0
+        self.ego_heading = 0.0
+        self.ego_speed = EGO_BASE_SPEED_MPS
+
     @property
     def meta(self):
         return {
@@ -101,6 +122,35 @@ class MockFeedGenerator:
         self.latency = _clamp(self.latency + self.rng.uniform(-1.5, 1.5), 20, 35)
         self.miou = _clamp(self.miou + self.rng.uniform(-0.008, 0.008), 0.60, 0.90)
         self.savings = _clamp(self.savings + self.rng.uniform(-1.0, 1.0), 55, 70)
+
+    def _advance_ego(self):
+        # Slow through the curve like a real vehicle taking a turn.
+        in_curve = EGO_STRAIGHT1_M <= self.ego_dist < EGO_STRAIGHT1_M + EGO_CURVE_ARC_M
+        speed = EGO_BASE_SPEED_MPS * (0.55 if in_curve else 1.0) + self.rng.uniform(-0.15, 0.15)
+        speed = _clamp(speed, 0.5, EGO_BASE_SPEED_MPS)
+        step = speed * self.dt
+
+        new_dist = self.ego_dist + step
+        wrapped = new_dist >= EGO_LOOP_LEN_M
+        self.ego_dist = new_dist % EGO_LOOP_LEN_M
+
+        if wrapped:
+            self.ego_x = 0.0
+            self.ego_y = 0.0
+            self.ego_heading = 0.0
+        else:
+            if self.ego_dist < EGO_STRAIGHT1_M:
+                heading = 0.0
+            elif self.ego_dist < EGO_STRAIGHT1_M + EGO_CURVE_ARC_M:
+                k = (self.ego_dist - EGO_STRAIGHT1_M) / EGO_CURVE_ARC_M
+                heading = EGO_CURVE_TURN_DEG * k
+            else:
+                heading = EGO_CURVE_TURN_DEG
+            rad = math.radians(heading)
+            self.ego_x += step * math.sin(rad)
+            self.ego_y += step * math.cos(rad)
+            self.ego_heading = heading
+        self.ego_speed = speed
 
     def _build_grid(self):
         occupied = {}
@@ -174,15 +224,26 @@ class MockFeedGenerator:
         self.frame_idx += 1
         self._advance_objects()
         self._advance_metrics()
+        self._advance_ego()
         frame = {
             "timestamp": round(self.frame_idx * self.dt, 3),
             "grid": self._build_grid(),
             "objects": self._build_objects_payload(),
+            "ego_pose": {
+                "x": round(self.ego_x, 2),
+                "y": round(self.ego_y, 2),
+                "heading_deg": round(self.ego_heading, 2),
+                "speed_mps": round(self.ego_speed, 2),
+            },
             "metrics": {
                 "fps": round(self.fps, 1),
                 "latency_ms": round(self.latency, 1),
                 "miou": round(self.miou, 3),
                 "compute_savings_pct": round(self.savings, 1),
+                # real process RSS, not a grid-memory-savings claim -- swap
+                # in a real adaptive-vs-uniform grid comparison later if the
+                # grid engine exposes one.
+                "memory_mb": round(psutil.Process().memory_info().rss / 1e6, 1),
             },
         }
         return frame

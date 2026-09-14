@@ -1,6 +1,4 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useLiveFeed } from "../hooks/useLiveFeed.js";
+import { useOutletContext } from "react-router-dom";
 import { useContainerSize } from "../hooks/useContainerSize.js";
 import PolarGrid from "../components/PolarGrid.jsx";
 import StatTile from "../components/StatTile.jsx";
@@ -8,31 +6,24 @@ import Gauge from "../components/Gauge.jsx";
 import ObjectsTable from "../components/ObjectsTable.jsx";
 import ClassLegend from "../components/ClassLegend.jsx";
 import RingLegend from "../components/RingLegend.jsx";
-import Topbar from "../components/Topbar.jsx";
 import AdminControls from "../components/AdminControls.jsx";
 
 /**
- * Mission-ops console -- what a reviewer or fleet operator monitors: the
+ * Mission Ops section -- what a reviewer or fleet operator monitors: the
  * same live grid plus metrics trends, connection/model provenance, and the
  * full tracked-object table. Denser and more information-rich than the
- * car HUD by design.
+ * car HUD by design. Lives inside the DashboardLayout shell, which owns the
+ * live-feed connection and passes it down via Outlet context.
  */
 export default function AdminView() {
-  const { status, meta, frame, metricsHistory, trails } = useLiveFeed();
+  const { meta, frame, metricsHistory, trails } = useOutletContext();
   const [gridContainerRef, gridSize] = useContainerSize();
   const gridPx = Math.max(200, Math.min(gridSize.width, gridSize.height) - 8);
   const m = frame?.metrics;
   const isReal = meta?.mode === "real";
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (status === "unauthorized") navigate("/login", { state: { from: "/admin" }, replace: true });
-  }, [status, navigate]);
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--ground)" }}>
-      <Topbar active="admin" status={status} />
-
+    <div className="flex-1 min-h-0 w-full overflow-y-auto" style={{ background: "var(--ground)" }}>
       <div className="px-7 py-3 border-b flex flex-wrap items-center gap-x-5 gap-y-1.5 font-mono text-[11px]" style={{ borderColor: "var(--line)", color: "var(--ink-dim)" }}>
         <span>
           SOURCE <span className="text-[var(--ink)]">{meta?.source ?? "—"}</span>

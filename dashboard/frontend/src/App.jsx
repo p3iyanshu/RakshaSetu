@@ -1,37 +1,45 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import CarView from "./views/CarView.jsx";
 import AdminView from "./views/AdminView.jsx";
+import TopDownLidarView from "./views/TopDownLidarView.jsx";
+import LiveView from "./views/LiveView.jsx";
 import LoginView from "./views/LoginView.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
+import DashboardLayout from "./components/DashboardLayout.jsx";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="console-field" />
-      <div className="console-scanlines" />
-      <div className="relative z-[2]">
-        <Routes>
-          <Route path="/" element={<Navigate to="/car" replace />} />
-          <Route path="/login" element={<LoginView />} />
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard/lidar" replace />} />
+        <Route path="/login" element={<LoginView />} />
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <DashboardLayout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Navigate to="lidar" replace />} />
+          <Route path="lidar" element={<TopDownLidarView />} />
+          <Route path="live" element={<LiveView />} />
+          <Route path="car" element={<CarView />} />
           <Route
-            path="/car"
-            element={
-              <RequireAuth>
-                <CarView />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/admin"
+            path="admin"
             element={
               <RequireAuth role="admin">
                 <AdminView />
               </RequireAuth>
             }
           />
-          <Route path="*" element={<Navigate to="/car" replace />} />
-        </Routes>
-      </div>
+        </Route>
+        {/* Legacy top-level and pre-redesign paths. */}
+        <Route path="/car" element={<Navigate to="/dashboard/car" replace />} />
+        <Route path="/live" element={<Navigate to="/dashboard/lidar" replace />} />
+        <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard/lidar" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }

@@ -173,7 +173,7 @@ def _sanitize_frame(frame: dict) -> dict:
         objects.append(o)
 
     metrics = dict(frame.get("metrics") or {})
-    for key in ("fps", "latency_ms", "miou", "compute_savings_pct"):
+    for key in ("fps", "latency_ms", "miou", "compute_savings_pct", "memory_mb"):
         if key in metrics:
             metrics[key] = _finite(metrics[key])
 

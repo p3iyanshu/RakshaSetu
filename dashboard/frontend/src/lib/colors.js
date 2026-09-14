@@ -26,7 +26,7 @@ export const CLASS_COLOR = {
   1: { base: "#e2584f", label: "Static: wall" },
   2: { base: "#c9483f", label: "Static: pole" },
   3: { base: "#e2a23b", label: "Dynamic: vehicle" },
-  4: { base: "#f0883a", label: "Dynamic: pedestrian" },
+  4: { base: "#f0883a", label: "Dynamic: human" },
   5: { base: "#8a8f98", label: "Unclassified" },
 };
 
