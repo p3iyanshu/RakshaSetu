@@ -53,6 +53,7 @@ class GridCell:
     cls: int                       # dominant class in this cell, same 6-class mapping as Segmentation
     height_max: float
     height_mean: float
+    height_variance: float         # addition beyond interfaces.md SS5's original 5 fields -- population variance (ddof=0), see grid_engine/grid_builder.py; flag to Member 4 before relying on it in the wire format
     point_count: int
     confidence: float
     dynamic_track_id: int = None   # v2: set only by Fusion (Stage 5) for cells a tracked object currently occupies; absent otherwise (same sparse convention as the rest of the grid)
@@ -93,11 +94,16 @@ class FusedFrame:
     objects: list                # list[TrackedObject]; each carries grid_range_bin/grid_angular_bin
     metrics: dict                 # {"fps": float, "latency_ms": float, "miou": float, "compute_savings_pct": float}
 
-# Radial resolution bands: fine near the vehicle, coarse far away. Synced
-# from feature/grid-engine's shared/schemas.py -- Member 2 finalized 8 bands
-# (grid_engine/grid_builder.py) instead of the earlier 4-band placeholder.
-# Update this one place if/when Member 2 changes it again, and tell Member 3
-# (clustering's eps scales off these same bands).
+# Radial resolution bands: fine near the vehicle, coarse far away. Finalized
+# by Member 2 (grid_engine/grid_builder.py) from the [0,2,5,10,20,35,55,80]m
+# starting point suggested in ros2_ws/interfaces.md v2 SS5, extended to 100m
+# to match the mission's outer bound; cell size holds at 5cm out to 10m (the
+# "fine detail within a 10m radius" requirement) then grows to 50cm at 100m.
+# grid_engine/grid_builder.py's RANGE_BIN_EDGES is the source of truth --
+# keep this mirror in sync with it. tracking/clustering.py imports this
+# constant directly, so its DBSCAN eps (eps = cell_size * EPS_TO_CELL_RATIO)
+# picks up any future change here automatically -- no separate edit needed
+# there, but re-tune EPS_TO_CELL_RATIO if clustering quality regresses.
 RING_BOUNDARIES = [
     (0.0, 2.0, 0.05),
     (2.0, 5.0, 0.05),

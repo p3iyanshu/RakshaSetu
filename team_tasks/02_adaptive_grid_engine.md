@@ -133,13 +133,14 @@ Build a uniform-resolution version of the same grid (fixed 5cm cells everywhere 
     "class": int,          # 0=drivable, 1=static_obstacle_wall, 2=static_obstacle_pole, 3=dynamic_vehicle, 4=dynamic_pedestrian, 5=other_unknown
     "height_max": float,
     "height_mean": float,
+    "height_variance": float,  # added beyond the original locked 5 fields -- see note below
     "point_count": int,
     "confidence": float,
   },
   ...
 }
 ```
-This is already locked as of `ros2_ws/interfaces.md` v2 (§5) — Member 4's node wraps your function and republishes each key as the string `"{range_bin}_{angular_bin}"`. You don't need to produce that string yourself, just keep the tuple key and the field names above exact.
+The first 5 fields are locked as of `ros2_ws/interfaces.md` v2 (§5) — Member 4's node wraps your function and republishes each key as the string `"{range_bin}_{angular_bin}"`. You don't need to produce that string yourself, just keep the tuple key and the field names above exact. `height_variance` (population variance, ddof=0) was added on top of that locked set at explicit request, and is flagged in `ros2_ws/interfaces.md` SS5 and `shared/schemas.py`'s `GridCell` for Member 4 to confirm before it's added to the real ROS 2/JSON wire message.
 
 ## Tools
 NumPy, Open3D (ground-plane fitting), optionally Numba or Cython if pure Python binning is too slow for real-time.
@@ -160,9 +161,9 @@ NumPy, Open3D (ground-plane fitting), optionally Numba or Cython if pure Python 
 - **Week 4–5**: help with integration/optimization once your module is stable
 
 ## Deliverables checklist
-- [ ] Ground-plane fitting working
-- [ ] Radial `range_bin` lookup table with no alignment errors (edge cases tested)
-- [ ] Per-cell aggregation (class + height stats + confidence)
-- [ ] Sparse hash-map storage
-- [ ] Unit tests for boundary cases
-- [ ] Benchmark report: adaptive vs. uniform grid, memory/compute savings %
+- [x] Ground-plane fitting working (`grid_engine/grid_builder.py::fit_ground_plane`, Open3D RANSAC, guarded against <3-point/degenerate input)
+- [x] Radial `range_bin` lookup table with no alignment errors (edge cases tested) -- finalized 8-band `RANGE_BIN_EDGES`, mirrored in `shared/schemas.py::RING_BOUNDARIES`
+- [x] Per-cell aggregation (class + height stats + confidence) -- vectorized, confidence-weighted majority vote for class; height stats = max/mean/variance (variance added beyond the original locked field set, flagged for Member 4 in `ros2_ws/interfaces.md`)
+- [x] Sparse hash-map storage -- `dict[(range_bin, angular_bin)]`, only occupied cells stored
+- [x] Unit tests for boundary cases -- `grid_engine/tests/test_grid_builder.py` (12 tests: interior/outer range boundaries, out-of-range drop, near-origin, ±180° wraparound, aggregation correctness, degenerate ground plane) + `tests/test_contracts.py::test_grid_engine_output_matches_schema`
+- [x] Benchmark report: adaptive vs. uniform grid, memory/compute savings % -- `grid_engine/benchmark.py`; actual run: **61.5% fewer occupied cells**, see `grid_engine/README.md`

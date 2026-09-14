@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(ROOT, "shared"))
 sys.path.insert(0, os.path.join(ROOT, "data"))
 sys.path.insert(0, os.path.join(ROOT, "models"))
 sys.path.insert(0, os.path.join(ROOT, "tracking"))
+sys.path.insert(0, os.path.join(ROOT, "grid_engine"))
 
 from mock_data import generate_sequence, load_npz  # noqa: E402
 
@@ -78,6 +79,32 @@ def test_label_remap_covers_every_documented_semantickitti_id():
 
     with pytest.raises(ValueError):
         remap_semantic_ids(np.array([9999], dtype=np.int64))
+
+
+# ---------------------------------------------------------------------------
+# Member 2 -- Stage 3: Grid Engine output (grid_engine/grid_builder.py)
+# ---------------------------------------------------------------------------
+
+def test_grid_engine_output_matches_schema(mock_frame):
+    """Feeds the agreed mock segmented-point-cloud frame through the grid
+    engine and asserts every emitted cell matches the (range_bin,
+    angular_bin) -> {class, height_max, height_mean, point_count, confidence}
+    shape locked in ros2_ws/interfaces.md SS5, plus height_variance (an
+    addition beyond that base contract -- see grid_builder.py's docstring)."""
+    from grid_builder import build_adaptive_grid
+
+    points, labels, confidence = mock_frame
+    grid = build_adaptive_grid(points, labels, confidence)
+
+    assert len(grid) > 0
+    for (range_bin, angular_bin), cell in grid.items():
+        assert isinstance(range_bin, int)
+        assert isinstance(angular_bin, int)
+        assert set(cell.keys()) == {"class", "height_max", "height_mean", "height_variance", "point_count", "confidence"}
+        assert cell["class"] in (0, 1, 2, 3, 4, 5)
+        assert isinstance(cell["point_count"], int) and cell["point_count"] > 0
+        assert cell["height_variance"] >= 0.0
+        assert 0.0 <= cell["confidence"] <= 1.0
 
 
 # ---------------------------------------------------------------------------
