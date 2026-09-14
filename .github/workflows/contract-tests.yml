@@ -24,9 +24,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install numpy scipy scikit-learn pytest open3d
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r security/requirements.txt
+          pip install -r dashboard/backend/requirements.txt
+          pip install httpx  # needed for fastapi.testclient.TestClient
 
       - name: Run contract tests
         run: pytest tests/test_contracts.py -v
 
       - name: Run module test suites
         run: pytest tracking/tests/ grid_engine/tests/ -v
+
+      - name: Run security + dashboard auth/RBAC/input-validation test suites
+        run: pytest security/tests/ dashboard/backend/tests/ -v

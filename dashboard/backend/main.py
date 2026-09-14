@@ -47,7 +47,7 @@ REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from security import auth  # noqa: E402 -- must follow sys.path setup above
+from security import audit, auth  # noqa: E402 -- must follow sys.path setup above
 
 REAL_DATA_PATH = os.path.join(HERE, "data", "demo_sequence.json")
 
@@ -122,8 +122,10 @@ def require_role(*allowed_roles: str):
 def login(req: LoginRequest):
     role = auth.authenticate(req.username, req.password)
     if role is None:
+        audit.log_action("login", username=req.username, outcome="denied")
         raise HTTPException(status_code=401, detail="Invalid username or password")
     token = auth.create_access_token(req.username, role)
+    audit.log_action("login", username=req.username, role=role, outcome="success")
     return LoginResponse(access_token=token, role=role, username=req.username)
 
 
@@ -238,18 +240,30 @@ class FeedModeRequest(BaseModel):
 
 
 @app.post("/api/admin/feed-mode")
-def set_feed_mode(req: FeedModeRequest, _claims: dict = Depends(require_role(auth.ROLE_ADMIN))):
+def set_feed_mode(req: FeedModeRequest, claims: dict = Depends(require_role(auth.ROLE_ADMIN))):
     global _forced_mode
     _forced_mode = None if req.mode == "auto" else req.mode
     mode, _ = _current_source()
+    audit.log_action(
+        "admin.feed_mode", username=claims["sub"], role=claims["role"],
+        detail={"requested_mode": req.mode, "effective_mode": mode},
+    )
     return {"forced_mode": _forced_mode, "effective_mode": mode}
 
 
 @app.post("/api/admin/reset-mock")
-def reset_mock(_claims: dict = Depends(require_role(auth.ROLE_ADMIN))):
+def reset_mock(claims: dict = Depends(require_role(auth.ROLE_ADMIN))):
     global _mock
     _mock = MockFeedGenerator()
+    audit.log_action("admin.reset_mock", username=claims["sub"], role=claims["role"])
     return {"status": "reset"}
+
+
+@app.get("/api/admin/audit-log")
+def get_audit_log(limit: int = 100, _claims: dict = Depends(require_role(auth.ROLE_ADMIN))):
+    """Admin-only view of the audit trail -- lets a judge/teammate see the
+    demo's own security log without shelling into the server."""
+    return {"events": audit.read_recent(limit=limit)}
 
 
 # ---------------------------------------------------------------------------
@@ -260,15 +274,18 @@ def reset_mock(_claims: dict = Depends(require_role(auth.ROLE_ADMIN))):
 async def live_feed(websocket: WebSocket):
     token = websocket.query_params.get("token")
     if not token:
+        audit.log_action("ws.connect", outcome="denied", detail={"reason": "missing token"})
         await websocket.close(code=4401)
         return
     try:
-        auth.decode_token(token)
+        claims = auth.decode_token(token)
     except JWTError:
+        audit.log_action("ws.connect", outcome="denied", detail={"reason": "invalid or expired token"})
         await websocket.close(code=4401)
         return
 
     await websocket.accept()
+    audit.log_action("ws.connect", username=claims["sub"], role=claims["role"], outcome="success")
     mode, real = _current_source()
     try:
         if mode == "real":

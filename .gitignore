@@ -30,3 +30,11 @@ models/runs/
 # and dev TLS certs are generated here; neither should ever be committed
 security/.env
 security/certs/
+
+# runtime audit trail (security/audit.py) -- generated log data, not source
+security/audit.log
+
+# ONNX/TensorRT export + benchmark outputs (security/export_onnx.py,
+# build_tensorrt_engine.py, benchmark_*.py) -- built/measured artifacts,
+# GPU-specific in the .engine case, never source
+security/optimized/
