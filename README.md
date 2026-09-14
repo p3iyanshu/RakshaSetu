@@ -18,11 +18,16 @@ New to this repo? Read in this order:
 ```
 shared/          interface contract (schemas.py) + mock LiDAR data generator + sample data
                  -- start here for a working dataset, no need to wait on real data
-tracking/        Member 3: clustering + tracking module
-team_tasks/      individual task briefs for all 6 members
+data/            Member 1: dataset pipeline (label remapping, cleaning, feature engineering)
+models/          Member 1: PointNet++ segmentation model, training, trained checkpoint
+grid_engine/     Member 2: adaptive variable-resolution 2.5D grid engine
+tracking/        Member 3: clustering + Kalman/SORT tracking, ego-motion compensation
+ros2_ws/         Member 4: ROS 2 pipeline contract (interfaces.md) + integration workspace
+dashboard/       Member 5: FastAPI backend + React/Tailwind live visualization frontend
+team_tasks/      individual task briefs (and post-review corrections) for all 6 members
 ```
 
-Other members' folders (`models/`, `grid_engine/`, `ros2_ws/`, `dashboard/`, `security/`) get added as each person starts their module — see `team_tasks/00_interfaces_and_handoff.md` for the full intended structure.
+`security/` (Member 6: security/optimization/testing) hasn't started yet — added once that work begins, per `team_tasks/00_interfaces_and_handoff.md`'s intended structure.
 
 ## Getting a working dataset immediately
 
