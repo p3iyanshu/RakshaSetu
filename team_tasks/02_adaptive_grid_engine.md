@@ -160,9 +160,9 @@ NumPy, Open3D (ground-plane fitting), optionally Numba or Cython if pure Python 
 - **Week 4–5**: help with integration/optimization once your module is stable
 
 ## Deliverables checklist
-- [ ] Ground-plane fitting working
-- [ ] Radial `range_bin` lookup table with no alignment errors (edge cases tested)
-- [ ] Per-cell aggregation (class + height stats + confidence)
-- [ ] Sparse hash-map storage
-- [ ] Unit tests for boundary cases
-- [ ] Benchmark report: adaptive vs. uniform grid, memory/compute savings %
+- [x] Ground-plane fitting working (`grid_engine/grid_builder.py::fit_ground_plane`, Open3D RANSAC, guarded against <3-point/degenerate input)
+- [x] Radial `range_bin` lookup table with no alignment errors (edge cases tested) -- finalized 8-band `RANGE_BIN_EDGES`, mirrored in `shared/schemas.py::RING_BOUNDARIES`
+- [x] Per-cell aggregation (class + height stats + confidence) -- vectorized, confidence-weighted majority vote for class
+- [x] Sparse hash-map storage -- `dict[(range_bin, angular_bin)]`, only occupied cells stored
+- [x] Unit tests for boundary cases -- `grid_engine/tests/test_grid_builder.py` (12 tests: interior/outer range boundaries, out-of-range drop, near-origin, ±180° wraparound, aggregation correctness, degenerate ground plane) + `tests/test_contracts.py::test_grid_engine_output_matches_schema`
+- [x] Benchmark report: adaptive vs. uniform grid, memory/compute savings % -- `grid_engine/benchmark.py`; actual run: **61.5% fewer occupied cells**, see `grid_engine/README.md`

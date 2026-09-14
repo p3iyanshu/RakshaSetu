@@ -93,15 +93,23 @@ class FusedFrame:
     objects: list                # list[TrackedObject]; each carries grid_range_bin/grid_angular_bin
     metrics: dict                 # {"fps": float, "latency_ms": float, "miou": float, "compute_savings_pct": float}
 
-# Radial resolution bands: fine near the vehicle, coarse far away. Kept as
-# the original 4-band placeholder (interfaces.md v2 SS5 suggests a starting
-# 8-edge set for the new range_bin concept, but explicitly leaves the exact
-# edges -- and cell sizes -- as Member 2's call to finalize). Update this one
-# place if/when Member 2 changes it, and tell Member 3 (clustering's eps
-# scales off these same bands).
+# Radial resolution bands: fine near the vehicle, coarse far away. Finalized
+# by Member 2 (grid_engine/grid_builder.py) from the [0,2,5,10,20,35,55,80]m
+# starting point suggested in ros2_ws/interfaces.md v2 SS5, extended to 100m
+# to match the mission's outer bound; cell size holds at 5cm out to 10m (the
+# "fine detail within a 10m radius" requirement) then grows to 50cm at 100m.
+# grid_engine/grid_builder.py's RANGE_BIN_EDGES is the source of truth --
+# keep this mirror in sync with it. tracking/clustering.py imports this
+# constant directly, so its DBSCAN eps (eps = cell_size * EPS_TO_CELL_RATIO)
+# picks up any future change here automatically -- no separate edit needed
+# there, but re-tune EPS_TO_CELL_RATIO if clustering quality regresses.
 RING_BOUNDARIES = [
-    (0.0, 10.0, 0.05),
-    (10.0, 30.0, 0.15),
-    (30.0, 60.0, 0.30),
-    (60.0, 100.0, 0.50),
+    (0.0, 2.0, 0.05),
+    (2.0, 5.0, 0.05),
+    (5.0, 10.0, 0.05),
+    (10.0, 20.0, 0.15),
+    (20.0, 35.0, 0.25),
+    (35.0, 55.0, 0.35),
+    (55.0, 80.0, 0.45),
+    (80.0, 100.0, 0.50),
 ]
