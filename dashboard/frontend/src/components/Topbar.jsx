@@ -1,9 +1,18 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ConnectionBadge from "./ConnectionBadge.jsx";
+import { getRole, getUsername, logout } from "../lib/auth.js";
 
 /** Shared console chrome: cut-corner brand mark + name/tag, a two-way mode
  * switch (car HUD <-> admin console), and live connection status. */
 export default function Topbar({ active, status }) {
+  const navigate = useNavigate();
+  const username = getUsername();
+  const role = getRole();
+
+  function handleLogout() {
+    logout();
+    navigate("/login", { replace: true });
+  }
   return (
     <header className="relative z-[5] flex items-center justify-between gap-5 px-7 py-4 border-b border-[var(--line)] bg-gradient-to-b from-[rgba(17,28,29,0.9)] to-[rgba(17,28,29,0.55)] backdrop-blur-md flex-wrap">
       <div className="flex items-center gap-3">
@@ -23,11 +32,25 @@ export default function Topbar({ active, status }) {
 
       <nav className="flex gap-2">
         <ModeButton to="/car" label="Vehicle HUD" isActive={active === "car"} />
-        <ModeButton to="/admin" label="Mission Ops" isActive={active === "admin"} />
+        {role === "admin" && <ModeButton to="/admin" label="Mission Ops" isActive={active === "admin"} />}
       </nav>
 
       <div className="flex items-center gap-4">
+        {username && (
+          <span className="font-mono text-[10.5px] text-[var(--ink-dim)] uppercase hidden sm:inline">
+            {username} &middot; {role}
+          </span>
+        )}
         <ConnectionBadge status={status} />
+        {username && (
+          <button
+            onClick={handleLogout}
+            className="font-display text-[11px] font-semibold tracking-[0.06em] uppercase px-3 py-1.5 border transition-colors"
+            style={{ color: "var(--ink-dim)", background: "var(--surface)", borderColor: "var(--line)" }}
+          >
+            Sign out
+          </button>
+        )}
       </div>
     </header>
   );

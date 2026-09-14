@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLiveFeed } from "../hooks/useLiveFeed.js";
 import { useContainerSize } from "../hooks/useContainerSize.js";
 import WindshieldView, { nearestAheadHazard } from "../components/WindshieldView.jsx";
@@ -18,6 +20,11 @@ const HAZARD_ALERT_RANGE_M = 20;
 export default function CarView() {
   const { status, frame, trails } = useLiveFeed();
   const [containerRef, size] = useContainerSize();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (status === "unauthorized") navigate("/login", { state: { from: "/car" }, replace: true });
+  }, [status, navigate]);
   const occupiedCells = frame?.grid ? frame.grid.filter((c) => c.point_count > 0).length : null;
   const nearest = frame?.objects ? nearestAheadHazard(frame.objects) : null;
   const showAlert = nearest && nearest.dist <= HAZARD_ALERT_RANGE_M;

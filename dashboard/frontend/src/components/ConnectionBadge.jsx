@@ -3,6 +3,7 @@ const STATUS_STYLE = {
   connecting: { label: "Connecting…", color: "#e2a23b", pulse: true },
   closed: { label: "Reconnecting…", color: "#e2a23b", pulse: true },
   error: { label: "Connection error", color: "#e2584f", pulse: false },
+  unauthorized: { label: "Session expired", color: "#e2584f", pulse: false },
 };
 
 export default function ConnectionBadge({ status }) {

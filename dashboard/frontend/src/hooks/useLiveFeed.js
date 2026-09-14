@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { authHeaders, getToken, logout } from "../lib/auth.js";
 
 // Default to the backend's own host so the dashboard works when opened from
 // another device on the LAN, not just localhost. Override via .env if needed.
 const DEFAULT_HOST = typeof window !== "undefined" ? window.location.hostname : "localhost";
-const WS_URL = import.meta.env.VITE_WS_URL || `ws://${DEFAULT_HOST}:8000/ws/live-feed`;
+const WS_BASE = import.meta.env.VITE_WS_URL || `ws://${DEFAULT_HOST}:8000/ws/live-feed`;
 const REST_URL = import.meta.env.VITE_API_URL || `http://${DEFAULT_HOST}:8000/api/initial-state`;
 
 const MAX_METRIC_HISTORY = 60; // ~6-20s of sparkline history depending on feed rate
@@ -21,7 +22,7 @@ function emptyMetricsHistory() {
  * concern, not something the backend needs to compute.
  */
 export function useLiveFeed() {
-  const [status, setStatus] = useState("connecting"); // connecting | open | closed | error
+  const [status, setStatus] = useState("connecting"); // connecting | open | closed | error | unauthorized
   const [meta, setMeta] = useState(null);
   const [frame, setFrame] = useState(null);
   const [metricsHistory, setMetricsHistory] = useState(emptyMetricsHistory());
@@ -60,10 +61,17 @@ export function useLiveFeed() {
   // One-shot REST snapshot so the UI paints before the WebSocket connects.
   useEffect(() => {
     let cancelled = false;
-    fetch(REST_URL)
-      .then((r) => r.json())
+    fetch(REST_URL, { headers: authHeaders() })
+      .then((r) => {
+        if (r.status === 401) {
+          logout();
+          if (!cancelled) setStatus("unauthorized");
+          return null;
+        }
+        return r.json();
+      })
       .then((data) => {
-        if (cancelled) return;
+        if (cancelled || !data) return;
         setMeta(data.meta);
         applyFrame(data.frame);
       })
@@ -83,8 +91,13 @@ export function useLiveFeed() {
 
     function connect() {
       if (cancelled) return;
+      const token = getToken();
+      if (!token) {
+        setStatus("unauthorized");
+        return;
+      }
       setStatus("connecting");
-      socket = new WebSocket(WS_URL);
+      socket = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
 
       socket.onopen = () => {
         retryRef.current = 0;
@@ -99,8 +112,16 @@ export function useLiveFeed() {
           // ignore malformed message, keep the connection alive
         }
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (cancelled) return;
+        // 4401 is this backend's app-level "bad/expired token" close code
+        // (sent before the handshake completes) -- retrying with the same
+        // token would just fail again, so stop and send the user to login.
+        if (event.code === 4401) {
+          logout();
+          setStatus("unauthorized");
+          return;
+        }
         setStatus("closed");
         const delay = Math.min(5000, 500 * 2 ** retryRef.current);
         retryRef.current += 1;

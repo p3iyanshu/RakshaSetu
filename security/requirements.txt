@@ -1,0 +1,13 @@
+python-jose[cryptography]>=3.3
+bcrypt>=4.1
+python-dotenv>=1.0
+
+# Optimization (export_onnx.py, build_tensorrt_engine.py, benchmark_*.py) --
+# only needed to re-run the ONNX/TensorRT export+benchmark pass, not for
+# running the dashboard backend or its test suite.
+onnx>=1.17
+onnxruntime>=1.20
+# tensorrt (GPU + matching CUDA/driver required -- see build_tensorrt_engine.py's
+# own docstring) is deliberately NOT pinned here: it's platform/GPU-specific,
+# large, and every environment that needs it should install the exact build
+# NVIDIA recommends for its own CUDA version rather than a generic pip line.

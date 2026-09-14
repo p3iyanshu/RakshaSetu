@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLiveFeed } from "../hooks/useLiveFeed.js";
 import { useContainerSize } from "../hooks/useContainerSize.js";
 import PolarGrid from "../components/PolarGrid.jsx";
@@ -7,6 +9,7 @@ import ObjectsTable from "../components/ObjectsTable.jsx";
 import ClassLegend from "../components/ClassLegend.jsx";
 import RingLegend from "../components/RingLegend.jsx";
 import Topbar from "../components/Topbar.jsx";
+import AdminControls from "../components/AdminControls.jsx";
 
 /**
  * Mission-ops console -- what a reviewer or fleet operator monitors: the
@@ -20,6 +23,11 @@ export default function AdminView() {
   const gridPx = Math.max(200, Math.min(gridSize.width, gridSize.height) - 8);
   const m = frame?.metrics;
   const isReal = meta?.mode === "real";
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (status === "unauthorized") navigate("/login", { state: { from: "/admin" }, replace: true });
+  }, [status, navigate]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--ground)" }}>
@@ -67,6 +75,8 @@ export default function AdminView() {
             />
           </div>
         </section>
+
+        <AdminControls />
 
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,460px)_1fr] gap-6 items-start">
           <div className="cut border p-4 flex flex-col gap-3" style={{ borderColor: "var(--line)", background: "linear-gradient(180deg, var(--surface), rgba(17,28,29,0.65))" }}>
