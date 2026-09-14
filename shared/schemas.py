@@ -93,15 +93,18 @@ class FusedFrame:
     objects: list                # list[TrackedObject]; each carries grid_range_bin/grid_angular_bin
     metrics: dict                 # {"fps": float, "latency_ms": float, "miou": float, "compute_savings_pct": float}
 
-# Radial resolution bands: fine near the vehicle, coarse far away. Kept as
-# the original 4-band placeholder (interfaces.md v2 SS5 suggests a starting
-# 8-edge set for the new range_bin concept, but explicitly leaves the exact
-# edges -- and cell sizes -- as Member 2's call to finalize). Update this one
-# place if/when Member 2 changes it, and tell Member 3 (clustering's eps
-# scales off these same bands).
+# Radial resolution bands: fine near the vehicle, coarse far away. Synced
+# from feature/grid-engine's shared/schemas.py -- Member 2 finalized 8 bands
+# (grid_engine/grid_builder.py) instead of the earlier 4-band placeholder.
+# Update this one place if/when Member 2 changes it again, and tell Member 3
+# (clustering's eps scales off these same bands).
 RING_BOUNDARIES = [
-    (0.0, 10.0, 0.05),
-    (10.0, 30.0, 0.15),
-    (30.0, 60.0, 0.30),
-    (60.0, 100.0, 0.50),
+    (0.0, 2.0, 0.05),
+    (2.0, 5.0, 0.05),
+    (5.0, 10.0, 0.05),
+    (10.0, 20.0, 0.15),
+    (20.0, 35.0, 0.25),
+    (35.0, 55.0, 0.35),
+    (55.0, 80.0, 0.45),
+    (80.0, 100.0, 0.50),
 ]

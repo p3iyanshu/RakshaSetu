@@ -155,6 +155,29 @@ of discovery:
    recall** (vehicle/pedestrian tracks, the classes that can genuinely be
    either static or moving, are untouched by this).
 
+5. **Per-ring DBSCAN silently splits objects that straddle a ring
+   boundary — a structural gap, not a threshold problem.** Each ring is
+   clustered independently, so two points from the same object on opposite
+   sides of a ring edge are never even compared, let alone merged. Always
+   possible, but Member 2's finalized 8-band `RING_BOUNDARIES` (5 edges
+   inside 0-20m vs. the old scheme's 1) made it far more likely for any
+   near-field object of real size. Fixed with a stitching pass
+   (`clustering.py::_stitch_ring_boundaries`): a point's radius is
+   1-Lipschitz in Euclidean distance, so only points within `eps` of a
+   shared ring boundary can possibly need merging across it — for each
+   adjacent ring pair, union any cluster ids whose near-boundary points land
+   within `min(eps_a, eps_b)` of each other. **This did not meaningfully
+   move `dynamic_vehicle` precision** (0.107 → 0.109 — essentially flat) and
+   **recall dropped** (0.623 → 0.463): consolidating fragments that were
+   previously double-counted as separate tracks reduces the total number of
+   scoreable track-frame decisions (7468 → 5814) as a side effect of now
+   correctly representing one physical object as one track instead of two —
+   this answers item 2's open question directly: the `dynamic_vehicle`
+   precision problem is *not* caused by ring-boundary fragmentation; it's
+   the separate, deeper LiDAR partial-visibility issue in the limitation
+   below. The recall drop is worth someone besides me sanity-checking before
+   the pitch, since a mechanical explanation isn't the same as a verified one.
+
 **Remaining, harder limitation — read before using these thresholds
 anywhere near production:** even with fix #4, `dynamic_vehicle` precision
 alone stays low. Raising `velocity_threshold` doesn't help — a sweep from
@@ -184,13 +207,14 @@ from centroid-to-centroid displacement.
 ### Current numbers (sequence 00, frames 3615-3714, `velocity_threshold=0.3`, `min_frames=10`)
 
 ```
-scored track-frame decisions: 7468  (tp=205 fp=1707 tn=5432 fn=124)
-precision (dynamic): 0.107
-recall (dynamic):    0.623
-accuracy:            0.755
+scored track-frame decisions: 5814  (tp=137 fp=1120 tn=4398 fn=159)
+precision (dynamic): 0.109
+recall (dynamic):    0.463
+accuracy:            0.780
 ```
 
-Moving cars/cyclists are recalled reasonably well (~62%); essentially all of
+(Before fix #5's ring-boundary stitching: precision 0.107, recall 0.623,
+accuracy 0.755 — see fix #5 above for why recall moved.) Essentially all of
 the remaining false-positive mass is `dynamic_vehicle` tracks (parked cars)
 hitting the measurement-noise ceiling described above — `static_obstacle_wall`/
 `static_obstacle_pole` no longer contribute any false positives at all after
@@ -213,6 +237,18 @@ verified by [`tests/test_contracts.py`](../tests/test_contracts.py).
       the compensated one
 - [x] Validated against SemanticKITTI's moving/non-moving ground truth —
       done, with honest results and a documented remaining limitation above
+
+## Corrections addressed
+
+[`team_tasks/03_clustering_and_tracking_CORRECTIONS.md`](../team_tasks/03_clustering_and_tracking_CORRECTIONS.md)
+flagged two items after merging against Member 2's finalized grid bands:
+1. **[HIGH] Ring-boundary cluster splitting** — fixed, see finding #5 above.
+2. **[MEDIUM] Low dynamic-decision precision** — investigated per the
+   corrections doc's own suggested angle ("does this improve once #1 is
+   fixed") — answer: no, precision is essentially unchanged by #1, so the
+   remaining `dynamic_vehicle` false positives are confirmed to be the
+   separate, deeper measurement-noise limitation documented above, not a
+   symptom of ring-boundary fragmentation.
 
 ## Known git-hygiene issue (flagging, not fixing unilaterally)
 

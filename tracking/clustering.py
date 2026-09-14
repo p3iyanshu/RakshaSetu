@@ -11,6 +11,7 @@ import sys
 
 import numpy as np
 from sklearn.cluster import DBSCAN
+from scipy.spatial import cKDTree
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared"))
 from schemas import (
@@ -39,8 +40,77 @@ def _ring_eps(radius_m):
     return RING_BOUNDARIES[-1][2] * EPS_TO_CELL_RATIO  # beyond 100m: use farthest band
 
 
+def _stitch_ring_boundaries(points_xyz, radius, cluster_ids, ring_eps):
+    """Union cluster ids split across a ring boundary.
+
+    Per-ring DBSCAN never compares a point in ring i against a point in ring
+    i+1, even when they're spatially adjacent -- two points from the same
+    physical object that happen to straddle a ring boundary come back as two
+    separate cluster ids, not because they're far apart, but because they
+    were never in the same DBSCAN call. Finer near-field bands (Member 2's
+    finalized 8-band RING_BOUNDARIES) make this much more likely to bite: a
+    real near-field object of nontrivial size now has 5 nearby boundaries
+    instead of 1 to straddle.
+
+    Fix: a point's radius is 1-Lipschitz in Euclidean distance (|r_a - r_b|
+    <= |p_a - p_b|), so two points within `eps` of each other must also be
+    within `eps` of each other's radius -- meaning only points within `eps`
+    of the shared boundary on either side can possibly need merging. For
+    each adjacent ring pair, check just those near-boundary points (already
+    clustered, non-noise) against each other and union any cluster ids
+    whose points land within min(eps_a, eps_b) across the boundary.
+    """
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for i in range(len(ring_eps) - 1):
+        lo_a, hi_a, eps_a = ring_eps[i]
+        lo_b, hi_b, eps_b = ring_eps[i + 1]
+        if hi_a != lo_b:
+            continue  # RING_BOUNDARIES isn't contiguous here -- nothing to stitch
+        merge_eps = min(eps_a, eps_b)
+        boundary = hi_a
+
+        side_a_mask = (radius >= boundary - merge_eps) & (radius < boundary) & (cluster_ids != -1)
+        side_b_mask = (radius >= boundary) & (radius < boundary + merge_eps) & (cluster_ids != -1)
+        if not np.any(side_a_mask) or not np.any(side_b_mask):
+            continue
+
+        ids_a = cluster_ids[side_a_mask]
+        ids_b = cluster_ids[side_b_mask]
+        tree_b = cKDTree(points_xyz[side_b_mask])
+        for a_idx, neighbors in enumerate(tree_b.query_ball_point(points_xyz[side_a_mask], r=merge_eps)):
+            for b_idx in neighbors:
+                union(int(ids_a[a_idx]), int(ids_b[b_idx]))
+
+    # Relabel every cluster id (touched by a union or not) to its root, then
+    # to a dense 0..k-1 range -- keeps the "small contiguous ids" contract
+    # extract_cluster_features and everything downstream already relies on.
+    present_ids = [cid for cid in np.unique(cluster_ids).tolist() if cid != -1]
+    roots = {cid: find(cid) for cid in present_ids}
+    root_to_new_id = {r: new_id for new_id, r in enumerate(sorted(set(roots.values())))}
+
+    remapped = cluster_ids.copy()
+    for cid in present_ids:
+        remapped[cluster_ids == cid] = root_to_new_id[roots[cid]]
+    return remapped
+
+
 def cluster_obstacles(points_xyz, labels, min_samples=MIN_SAMPLES):
-    """Runs DBSCAN per radial ring, with eps scaled to that ring's grid resolution.
+    """Runs DBSCAN per radial ring, with eps scaled to that ring's grid resolution,
+    then stitches clusters back together across ring boundaries (see
+    _stitch_ring_boundaries) so an object straddling a boundary isn't split.
 
     points_xyz: (N, 3) array, ego-vehicle-relative x, y, z
     labels: (N,) array with values in {STATIC, DYNAMIC} (drivable/ignore already filtered out)
@@ -53,11 +123,13 @@ def cluster_obstacles(points_xyz, labels, min_samples=MIN_SAMPLES):
     radius = np.linalg.norm(points_xyz[:, :2], axis=1)  # planar distance from ego vehicle
 
     next_id = 0
+    ring_eps = []
     for lo, hi, cell_size in RING_BOUNDARIES:
+        eps = cell_size * EPS_TO_CELL_RATIO
+        ring_eps.append((lo, hi, eps))
         ring_mask = (radius >= lo) & (radius < hi)
         if not np.any(ring_mask):
             continue
-        eps = cell_size * EPS_TO_CELL_RATIO
         ring_points = points_xyz[ring_mask]
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(ring_points)
         ring_labels = db.labels_
@@ -70,6 +142,9 @@ def cluster_obstacles(points_xyz, labels, min_samples=MIN_SAMPLES):
             next_id += 1
 
         cluster_ids[ring_mask] = local_ids
+
+    if next_id > 0:
+        cluster_ids = _stitch_ring_boundaries(points_xyz, radius, cluster_ids, ring_eps)
 
     return cluster_ids
 
