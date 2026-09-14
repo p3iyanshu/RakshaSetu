@@ -23,6 +23,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install numpy scipy scikit-learn pytest open3d
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Run contract tests
         run: pytest tests/test_contracts.py -v
+
+      - name: Run module test suites
+        run: pytest tracking/tests/ grid_engine/tests/ -v
