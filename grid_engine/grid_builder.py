@@ -16,6 +16,12 @@ Public API:
 
 Import RANGE_BIN_EDGES from here (mirrored into shared/schemas.py's
 RING_BOUNDARIES) -- never hand-duplicate the band table elsewhere.
+
+Each cell carries class/height_max/height_mean/point_count/confidence (the
+fields locked in ros2_ws/interfaces.md SS5) plus height_variance -- an
+addition beyond that base contract (population variance, ddof=0, so a
+single-point cell gets 0 rather than NaN); flag this to Member 4 before
+relying on it in ros2_ws/interfaces.md's wire format.
 """
 import numpy as np
 
@@ -169,6 +175,13 @@ def _build_grid(points, labels, confidence, edges, ground_plane=None):
     np.add.at(height_sum, inverse, height)
     height_mean = height_sum / counts
 
+    height_sq_sum = np.zeros(n_groups)
+    np.add.at(height_sq_sum, inverse, height * height)
+    # Population variance (ddof=0): sensible default when a cell can hold a
+    # single point (sample variance, ddof=1, would be undefined there).
+    # max(...,0) guards a tiny negative from floating-point cancellation.
+    height_variance = np.maximum(height_sq_sum / counts - height_mean * height_mean, 0.0)
+
     confidence_sum = np.zeros(n_groups)
     np.add.at(confidence_sum, inverse, confidence_v)
     confidence_mean = confidence_sum / counts
@@ -187,6 +200,7 @@ def _build_grid(points, labels, confidence, edges, ground_plane=None):
             "class": int(dominant_class[g]),
             "height_max": float(height_max[g]),
             "height_mean": float(height_mean[g]),
+            "height_variance": float(height_variance[g]),
             "point_count": int(counts[g]),
             "confidence": float(confidence_mean[g]),
         }

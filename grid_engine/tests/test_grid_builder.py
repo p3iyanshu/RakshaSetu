@@ -115,11 +115,25 @@ def test_aggregation_across_multiple_points_in_one_cell():
     assert len(grid) == 1
     cell = next(iter(grid.values()))
 
+    heights = [0.10, 0.30, 0.05]
+    mean = sum(heights) / 3
+    expected_variance = sum((h - mean) ** 2 for h in heights) / 3  # population variance, ddof=0
+
     assert cell["point_count"] == 3
     assert cell["height_max"] == pytest.approx(0.30)
-    assert cell["height_mean"] == pytest.approx((0.10 + 0.30 + 0.05) / 3)
+    assert cell["height_mean"] == pytest.approx(mean)
+    assert cell["height_variance"] == pytest.approx(expected_variance)
     assert cell["class"] == 0  # weighted vote: class 0 gets 0.9+0.05=0.95 > class 1's 0.8
     assert cell["confidence"] == pytest.approx((0.9 + 0.05 + 0.8) / 3)
+
+
+def test_single_point_cell_has_zero_variance():
+    points = _point(1.0, 0.0, 0.2)
+    labels = np.array([0])
+    confidence = np.array([0.9])
+    grid = build_adaptive_grid(points, labels, confidence, ground_plane=FLAT_GROUND)
+    cell = next(iter(grid.values()))
+    assert cell["height_variance"] == pytest.approx(0.0)
 
 
 def test_distinct_cells_stay_separate():
@@ -159,9 +173,10 @@ def test_grid_engine_output_matches_schema(mock_frame):
     assert isinstance(grid, dict)
     for (range_bin, angular_bin), cell in grid.items():
         assert isinstance(range_bin, int) and isinstance(angular_bin, int)
-        assert set(cell.keys()) == {"class", "height_max", "height_mean", "point_count", "confidence"}
+        assert set(cell.keys()) == {"class", "height_max", "height_mean", "height_variance", "point_count", "confidence"}
         assert cell["class"] in (0, 1, 2, 3, 4, 5)
         assert cell["point_count"] > 0
+        assert cell["height_variance"] >= 0.0
         assert 0.0 <= cell["confidence"] <= 1.0
 
 

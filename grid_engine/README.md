@@ -13,9 +13,14 @@ from grid_engine.grid_builder import build_adaptive_grid
 grid = build_adaptive_grid(points, labels, confidence)
 # grid: dict[(range_bin, angular_bin)] -> {
 #   "class": int, "height_max": float, "height_mean": float,
-#   "point_count": int, "confidence": float,
+#   "height_variance": float, "point_count": int, "confidence": float,
 # }
 ```
+
+`height_variance` (population variance, ddof=0, of point heights in the
+cell) is an addition beyond the 5 fields locked in `ros2_ws/interfaces.md`
+SS5 — flagged there for Member 4 to confirm before it goes into the actual
+ROS 2/JSON wire message.
 
 `points` is `(N, 4)` `[x, y, z, intensity]`; `labels` and `confidence` are
 `(N,)`. Pass a precomputed `ground_plane=(a, b, c, d)` to skip the RANSAC fit
@@ -40,9 +45,11 @@ grid = build_adaptive_grid(points, labels, confidence)
   straight-ahead (0°) instead of directly behind the vehicle, so points near
   ±180° land in adjacent bins instead of opposite ends of the array.
 - **Aggregation, not overwrite.** Every point in a cell contributes to
-  `point_count`, running max/mean height, and a confidence-weighted class
-  vote — dropping any of those loses the "2.5D" information (curb height,
-  pothole depth) that's the entire point of not going flat 2D.
+  `point_count`, running max/mean/variance height, and a confidence-weighted
+  class vote — dropping any of those loses the "2.5D" information (curb
+  height, pothole depth) that's the entire point of not going flat 2D.
+  `height_variance` in particular flags cells with mixed heights (e.g. a
+  curb edge, half road half wall) that `height_mean` alone would hide.
 - **Sparse dict, keyed by `(range_bin, angular_bin)`.** Only occupied cells
   are stored; this is where the actual memory savings come from, especially
   once you're aggregating a mostly-empty far field into large coarse cells.

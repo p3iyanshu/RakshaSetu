@@ -89,7 +89,8 @@ def test_grid_engine_output_matches_schema(mock_frame):
     """Feeds the agreed mock segmented-point-cloud frame through the grid
     engine and asserts every emitted cell matches the (range_bin,
     angular_bin) -> {class, height_max, height_mean, point_count, confidence}
-    shape locked in ros2_ws/interfaces.md SS5."""
+    shape locked in ros2_ws/interfaces.md SS5, plus height_variance (an
+    addition beyond that base contract -- see grid_builder.py's docstring)."""
     from grid_builder import build_adaptive_grid
 
     points, labels, confidence = mock_frame
@@ -99,9 +100,10 @@ def test_grid_engine_output_matches_schema(mock_frame):
     for (range_bin, angular_bin), cell in grid.items():
         assert isinstance(range_bin, int)
         assert isinstance(angular_bin, int)
-        assert set(cell.keys()) == {"class", "height_max", "height_mean", "point_count", "confidence"}
+        assert set(cell.keys()) == {"class", "height_max", "height_mean", "height_variance", "point_count", "confidence"}
         assert cell["class"] in (0, 1, 2, 3, 4, 5)
         assert isinstance(cell["point_count"], int) and cell["point_count"] > 0
+        assert cell["height_variance"] >= 0.0
         assert 0.0 <= cell["confidence"] <= 1.0
 
 

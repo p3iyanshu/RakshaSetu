@@ -53,6 +53,7 @@ class GridCell:
     cls: int                       # dominant class in this cell, same 6-class mapping as Segmentation
     height_max: float
     height_mean: float
+    height_variance: float         # addition beyond interfaces.md SS5's original 5 fields -- population variance (ddof=0), see grid_engine/grid_builder.py; flag to Member 4 before relying on it in the wire format
     point_count: int
     confidence: float
     dynamic_track_id: int = None   # v2: set only by Fusion (Stage 5) for cells a tracked object currently occupies; absent otherwise (same sparse convention as the rest of the grid)

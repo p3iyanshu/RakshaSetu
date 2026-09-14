@@ -142,6 +142,7 @@ Each grid cell value is an object:
 | `class` | int | Dominant class ID in this cell (same mapping as Segmentation) |
 | `height_max` | float32 | Max point height (z) in this cell — this is the "0.5" in "2.5D": a 2D ground-plane grid with height carried per cell, not a full 3D voxel grid |
 | `height_mean` | float32 | Mean point height in this cell |
+| `height_variance` | float32 | **Addition beyond the original SS5 fields**, added at Member 2's implementation (`grid_engine/grid_builder.py`) — population variance of point heights in this cell (ddof=0, so a single-point cell is 0, never NaN). Flagging per this doc's own rule below ("don't silently build something different... message me directly") — Member 4, confirm before this is added to the actual ROS 2/JSON wire message. |
 | `point_count` | int | Number of points falling in this cell |
 | `confidence` | float32 | Aggregated confidence for this cell |
 
