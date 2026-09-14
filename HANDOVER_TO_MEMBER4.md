@@ -1,39 +1,26 @@
 # RakshaSetu — Handover: Members 1-3 → Member 4 (Systems Integration)
 
-**Purpose:** Members 1 (Segmentation), 2 (Grid Engine), and 3 (Tracking) are all functionally done and each has an open PR. This document is what you (Member 4) need to actually wrap each module into a ROS 2 node and wire the pipeline together, per `team_tasks/04_systems_integration_ros2.md`.
+**Purpose:** Members 1 (Segmentation), 2 (Grid Engine), and 3 (Tracking) are all functionally done and **already merged into `main`**. This document is what you (Member 4) need to actually wrap each module into a ROS 2 node and wire the pipeline together, per `team_tasks/04_systems_integration_ros2.md`.
 
 **Read this first, then go straight to `team_tasks/04_systems_integration_ros2.md`** — that's your own task brief (workspace setup, CARLA bridge, fusion node). This document only covers what you're receiving from Members 1-3, not your own remaining work.
 
----
-
-## 0. Do this first — there's a real merge conflict blocking everything
-
-All three PRs below ultimately build on `feature/segmentation-model`, and that branch **conflicts with `main`** on one file: `PROJECT_EXECUTION_PLAN.md`. `main`'s only unique commit added the plan on 2026-09-11; `feature/segmentation-model` independently kept evolving its own copy (corrections, status updates) ever since. It's a small, well-understood conflict — 29 lines, one file, nothing code-related:
-
-```bash
-git diff main feature/segmentation-model -- PROJECT_EXECUTION_PLAN.md
-```
-
-**Resolution:** take `feature/segmentation-model`'s version — it's the newer, corrected one. `README.md` and `.github/workflows/contract-tests.yml` do **not** conflict (verified identical on both sides), so this is genuinely isolated to the one file.
-
-All three PRs (#1, #2, #3 below) will show as "CONFLICTING" on GitHub until this is resolved once, since they all share this same ancestry.
+**If you're looking for `feature/segmentation-model`, `feature/grid-engine`, or `feature/tracking` and can't find them: that's expected, not a problem.** They were merged into `main` and GitHub auto-deleted them afterward — the same thing that happens to any merged branch with that repo setting on. The code isn't missing; it's in `main`. Just build on top of `main` directly, no need to hunt for or recreate those branches.
 
 ---
 
-## 1. What's open and where
+## 0. Merge history (resolved — informational only)
 
-| # | PR | Branch | Base | Status |
-|---|---|---|---|---|
-| [#1](https://github.com/p3iyanshu/RakshaSetu/pull/1) | Migrate to v2 contract; Member 1 data pipeline + trained model (mIoU 0.868) | `feature/segmentation-model` | `main` | Open, conflicting (see §0) |
-| [#2](https://github.com/p3iyanshu/RakshaSetu/pull/2) | [GridEngine] Adaptive variable-resolution 2.5D grid engine | `feature/grid-engine` | `feature/segmentation-model` | Open, mergeable |
-| [#3](https://github.com/p3iyanshu/RakshaSetu/pull/3) | [Tracking] Clustering + Kalman/SORT tracking, ego-motion compensation, SemanticKITTI validation | `feature/tracking` | `main` | Open, conflicting (see §0) |
+The three PRs below all built on `feature/segmentation-model`, which briefly conflicted with `main` on one file (`PROJECT_EXECUTION_PLAN.md` — `main`'s 2026-09-11 copy vs. `feature/segmentation-model`'s independently-evolving one). **This was resolved and all three PRs have since merged:**
 
-**Suggested merge order**, since #2 stacks on #1 and #3 currently duplicates most of #1's diff (see the note in PR #3 itself):
-1. Resolve §0's conflict, merge **#1** into `main`.
-2. Merge **#2** (grid engine) — it's based on `feature/segmentation-model`, so re-target it at `main` after step 1, or merge it as-is and it'll still land correctly.
-3. **#3** (tracking) will then show as already-merged/no-diff against `main` for everything except its one real unique commit (`d009b8c`, the ring-boundary fix) — cherry-pick that commit onto `main` directly if the PR itself looks redundant by then, rather than merging the whole branch.
+| # | PR | Was | Merged into `main` as |
+|---|---|---|---|
+| [#1](https://github.com/p3iyanshu/RakshaSetu/pull/1) | Migrate to v2 contract; Member 1 data pipeline + trained model (mIoU 0.868) | `feature/segmentation-model` → `main` | `15b2c7d` |
+| [#2](https://github.com/p3iyanshu/RakshaSetu/pull/2) | [GridEngine] Adaptive variable-resolution 2.5D grid engine | `feature/grid-engine` → `feature/segmentation-model` | `f3d1151` |
+| [#3](https://github.com/p3iyanshu/RakshaSetu/pull/3) | [Tracking] Clustering + Kalman/SORT tracking, ego-motion compensation, SemanticKITTI validation | `feature/tracking` → `main` | merged |
 
-All three PRs' contract tests are green (`pytest tests/test_contracts.py -v`).
+Also merged since: [#4](https://github.com/p3iyanshu/RakshaSetu/pull/4) (CI fix — installs `torch`, runs the full suite not just contract tests) and [#5](https://github.com/p3iyanshu/RakshaSetu/pull/5) (README repo-layout update). **[#6](https://github.com/p3iyanshu/RakshaSetu/pull/6) (Member 6, security/optimization) is still open as of this update** — not part of what this document covers, but worth knowing it exists.
+
+All contract tests are green on `main` (`pytest tests/test_contracts.py -v`).
 
 ---
 
@@ -126,4 +113,4 @@ objects = tracker.update(clusters, ego_velocity=ego_odometry.linear_velocity[:2]
 
 Per `team_tasks/04_systems_integration_ros2.md`, your own remaining work is: ROS 2 workspace + node stubs, CARLA bridge, timing/QoS, and the fusion node (the one piece that's actually yours to write, not just wrapping). `interfaces.md` already has the exact wire schema for every topic these three modules feed into — nothing above changes that contract, this document just tells you where the real functions live and what to expect from them today.
 
-One thing worth flagging to the team once you're set up: item #1 above (`PROJECT_EXECUTION_PLAN.md` conflict) is trivial to fix but blocks a clean merge history for all three PRs — worth doing before end-of-day so nobody else hits it independently.
+Branch off `main` for your own work (e.g. `feature/ros2-integration`) — everything from Members 1-3 is already there, so there's no upstream branch left to base on or wait for.
