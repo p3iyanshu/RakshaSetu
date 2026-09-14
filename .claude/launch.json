@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "dashboard/frontend"],
       "port": 5173
+    },
+    {
+      "name": "rakshasetu-dashboard-backend",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--reload", "--port", "8000", "--app-dir", "dashboard/backend"],
+      "port": 8000
     }
   ]
 }

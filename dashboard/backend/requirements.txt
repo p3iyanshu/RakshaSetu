@@ -1,3 +1,6 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 websockets>=12.0
+
+# Auth (security/auth.py, Member 6) -- JWT + password hashing
+-r ../../security/requirements.txt

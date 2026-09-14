@@ -25,3 +25,8 @@ models/checkpoints/
 models/runs/
 *.pth
 *.onnx
+
+# security (Member 6) -- JWT secret + demo passwords resolve here at runtime,
+# and dev TLS certs are generated here; neither should ever be committed
+security/.env
+security/certs/
