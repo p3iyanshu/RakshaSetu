@@ -190,6 +190,25 @@ own guidance.
 **Verified**: `pytest tests/test_contracts.py tracking/tests/ -v` — 19/19
 passing, including the real trained-checkpoint contract test.
 
+**A second real bug found and fixed the same day, while regenerating the
+dashboard demo feed against this checkpoint**: `models/inference.py` was
+running the model on full raw scans (~100-125K points) directly, but
+`PointNet2SegMSG` is trained on 8192-point frames — its Set Abstraction
+layers sample a *fixed number* of centers per layer regardless of input
+size, so at full density those centers represented a far sparser slice of
+the scene than in training, a real distribution shift (measured: mIoU 0.32
+on a full-density frame, with `static_obstacle_pole` over-predicted at 47%
+vs. 2.4% actual). This is the identical class of bug this project's first,
+now-retired segmentation architecture had already found and fixed — the fix
+didn't carry over when `pointnet2_seg.py` replaced it. Re-applied the same
+downsample-then-propagate strategy; recovered to mIoU 0.62 on the same
+frame, and ~5x faster as a side effect. See `models/README.md` and commit
+`659b58b`. `dashboard/backend/data/demo_sequence.json` regenerated with the
+fix — its own `meta.note` field explains why that clip's avg per-frame mIoU
+(0.558) still reads below this checkpoint's held-out validation mIoU
+(0.868): `classify()` has no ground truth to sample by class with at
+inference, unlike training/validation.
+
 **nuScenes-mini / CARLA generalization cross-check**: explicitly descoped
 for the 2026-09-16 internal hackathon (decision recorded 2026-09-14, §3
 item 4) — SemanticKITTI-only for this milestone.
