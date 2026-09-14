@@ -1,0 +1,43 @@
+feature,class_id,class_name,class_support,iv,n_bins_used,interpretation,feature_decision
+range,0,drivable_terrain,2535,0.23943743399839998,10,medium,KEEP
+range,1,static_obstacle_wall,1913,0.26950019934286246,10,medium,KEEP
+range,2,static_obstacle_pole,121,0.7151919758903736,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+range,3,dynamic_vehicle,634,0.7108057435323302,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+range,4,dynamic_pedestrian,8,0.9432135240138142,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+range,5,other_unknown,4789,0.04205073978120404,10,weak,KEEP
+azimuth,0,drivable_terrain,2535,1.0479475372162568,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+azimuth,1,static_obstacle_wall,1913,0.3999022369395222,10,strong,KEEP
+azimuth,2,static_obstacle_pole,121,0.20307080833786129,10,medium,KEEP
+azimuth,3,dynamic_vehicle,634,0.29713787157195226,10,medium,KEEP
+azimuth,4,dynamic_pedestrian,8,0.7253658416595126,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+azimuth,5,other_unknown,4789,0.15848865123033493,10,medium,KEEP
+elevation,0,drivable_terrain,2535,1.6516536996290405,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+elevation,1,static_obstacle_wall,1913,0.827852998794792,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+elevation,2,static_obstacle_pole,121,0.9214465682382474,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+elevation,3,dynamic_vehicle,634,0.11746503807475722,10,medium,KEEP
+elevation,4,dynamic_pedestrian,8,0.4807031362849095,10,strong,KEEP
+elevation,5,other_unknown,4789,0.03363760881472684,10,weak,KEEP
+z_raw,0,drivable_terrain,2535,3.132281459116789,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+z_raw,1,static_obstacle_wall,1913,1.3489173018052032,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+z_raw,2,static_obstacle_pole,121,1.2848124289988045,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+z_raw,3,dynamic_vehicle,634,1.4396863889208562,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+z_raw,4,dynamic_pedestrian,8,0.7253658416595126,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+z_raw,5,other_unknown,4789,0.15330230722288304,10,medium,KEEP
+height_above_ground,0,drivable_terrain,2535,4.776166927911543,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+height_above_ground,1,static_obstacle_wall,1913,1.5168417541668517,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+height_above_ground,2,static_obstacle_pole,121,1.5095839395386965,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+height_above_ground,3,dynamic_vehicle,634,1.4957440053195463,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+height_above_ground,4,dynamic_pedestrian,8,0.6450673490261082,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+height_above_ground,5,other_unknown,4789,0.15223571720409906,10,medium,KEEP
+local_density,0,drivable_terrain,2535,0.8052087773124529,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+local_density,1,static_obstacle_wall,1913,0.45225519007322285,10,strong,KEEP
+local_density,2,static_obstacle_pole,121,0.3056826757849508,10,strong,KEEP
+local_density,3,dynamic_vehicle,634,0.3968075085085585,10,strong,KEEP
+local_density,4,dynamic_pedestrian,8,0.8866176509850171,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+local_density,5,other_unknown,4789,0.03599274389411754,10,weak,KEEP
+intensity,0,drivable_terrain,2535,0.6593856970316998,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+intensity,1,static_obstacle_wall,1913,0.37216675916074377,10,strong,KEEP
+intensity,2,static_obstacle_pole,121,0.14914031390225188,10,medium,KEEP
+intensity,3,dynamic_vehicle,634,0.9122328674881662,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+intensity,4,dynamic_pedestrian,8,0.6746303882549268,10,SUSPICIOUSLY HIGH (check leakage),KEEP
+intensity,5,other_unknown,4789,0.13326283860783428,10,medium,KEEP

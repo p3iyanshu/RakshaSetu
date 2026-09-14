@@ -11,6 +11,23 @@ Your work is cross-cutting — it applies on top of what everyone else builds, s
 
 ---
 
+## Setup — get your environment ready
+
+```bash
+python -m venv .venv
+# Windows (PowerShell):  .venv\Scripts\Activate.ps1
+# macOS/Linux:            source .venv/bin/activate
+
+pip install "python-jose[cryptography]" fastapi-users pytest onnx onnxruntime
+```
+`openssl` is needed for the TLS cert command in your brief below — it ships with Git Bash on Windows, or install via `choco install openssl` if it's not already on your PATH. Verify with `openssl version`.
+
+TensorRT itself is NVIDIA-GPU- and driver-version-specific to install — follow NVIDIA's current install guide for your exact CUDA version rather than a generic `pip install`; budget real time for this, it is rarely a five-minute install.
+
+**While you're floating in weeks 1–2:** don't wait for a formal assignment to help — proactively check in on whichever of Member 2 (grid engine) or Member 4 (ROS 2 integration) is furthest behind, since those two are the current critical-path risk (see `PROJECT_EXECUTION_PLAN.md` §7), and start the security architecture doc in parallel.
+
+---
+
 ## Task breakdown
 
 ### 1. Security — set this up early enough to not be an afterthought
@@ -70,6 +87,14 @@ Record a pre-recorded fallback video of a full successful run. If the live demo 
 
 ## Tools
 TensorRT, ONNX Runtime, SROS2, `python-jose`/`fastapi-users`, `pytest`, a screen recorder (OBS or similar) for the fallback video.
+
+## Common pitfalls
+
+- **A hardcoded JWT secret committed to the repo.** Use an environment variable (`.env`, already `.gitignore`-able — check it's actually listed) — a secret in git history is compromised even if you remove it in a later commit.
+- **Wiring in TLS/SROS2 in the last week "once things are stable."** By then nobody has tested against it, and it becomes the thing that breaks the demo. Get it in early enough (week 3 per your timeline below) that every subsequent PR is already running against it.
+- **Benchmarking latency including one-time model load time.** Loading a model/engine happens once at startup; if it's included in your per-frame latency measurement, your reported FPS will be wrong (too low) and won't match reality — measure steady-state per-frame latency after warmup, separately from cold-start time.
+- **Reporting metrics that don't arithmetically agree with each other.** If FPS is reported as 42, latency should be ~24ms (`1000/42`) — judges do check this; pull every final number from the same benchmark run rather than combining numbers measured under different conditions.
+- **A fallback video that's out of date.** Re-record it whenever the pipeline changes meaningfully — a fallback showing an old, less complete version of the system undersells the actual work if it ever has to be shown.
 
 ## Timeline
 - **Weeks 1–2**: float and help wherever the team is bottlenecked (likely Member 1's training); start drafting the security architecture doc in parallel

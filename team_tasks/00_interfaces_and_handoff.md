@@ -11,46 +11,71 @@ Every member's module is judged by one thing: does it accept and produce data in
 
 Put this file in the repo at `shared/schemas.py` and **import from it — never redefine these shapes locally.**
 
+**v2 (2026-09-12):** the full topic-level contract now lives in [`ros2_ws/interfaces.md`](../ros2_ws/interfaces.md) (Member 4, v2) — it documents every ROS 2 topic, JSON wire shape, and the reasoning behind each field. What follows below is the Python-side mirror of that contract as it exists in `shared/schemas.py` today. **If this ever looks out of sync with the actual `shared/schemas.py` file or with `ros2_ws/interfaces.md`, the code file and `ros2_ws/interfaces.md` win — update this copy to match, don't trust this copy over them.** (This exact staleness — this file quoting the old 3-class scheme after the code had already moved to 6 — is what happened between v1 and v2; keeping a second hand-copied version of a contract is exactly the kind of drift Part 1's own rule warns against.)
+
 ```python
 # shared/schemas.py — the single source of truth. Import this, don't redefine these shapes.
 
 from dataclasses import dataclass
-import numpy as np
 
 # ---- Stage 1: Raw ingest (Member 4's lidar_ingest_node) ----
 # points: np.ndarray, shape (N, 4) -> columns: x, y, z, intensity
 
+DRIVABLE = 0
+STATIC_OBSTACLE_WALL = 1
+STATIC_OBSTACLE_POLE = 2
+DYNAMIC_VEHICLE = 3
+DYNAMIC_PEDESTRIAN = 4
+OTHER_UNKNOWN = 5
+IGNORE = 255   # training-time-only sentinel -- classify() never emits this at inference
+
 # ---- Stage 2: Segmentation output (Member 1 -> Members 2, 3) ----
 @dataclass
 class SegmentationOutput:
-    labels: np.ndarray        # shape (N,), values in {0, 1, 2, 255}
-                               # 0=drivable, 1=static_obstacle, 2=dynamic_object, 255=ignore
-    confidence: np.ndarray     # shape (N,), float in [0.0, 1.0]
+    labels: "np.ndarray"        # shape (N,), values in {0,1,2,3,4,5} at inference
+    confidence: "np.ndarray"    # shape (N,), float in [0.0, 1.0]
 
 # ---- Stage 3: Grid Engine output (Member 2 -> Member 4) ----
+# Indexed by ground-plane position (range_bin, angular_bin) -- NOT LiDAR
+# vertical channel (a v1 mistake, corrected in interfaces.md v2). String key
+# "{range_bin}_{angular_bin}" on the wire.
 @dataclass
 class GridCell:
-    ring: int                  # 0-3, which resolution band (5cm/15cm/30cm/50cm)
+    range_bin: int               # radial distance band index from the ego vehicle
     angular_bin: int
-    cls: int                   # 0=drivable, 1=static_obstacle, 2=dynamic_object
+    cls: int                     # dominant class, same 6-class mapping as Segmentation
     height_max: float
     height_mean: float
     point_count: int
     confidence: float
+    dynamic_track_id: int = None # set only by Fusion, for cells a tracked object occupies
 
-# Full grid = dict[(ring, angular_bin), GridCell]
+# Full grid = dict[(range_bin, angular_bin), GridCell]
 
 # ---- Stage 4: Tracking output (Member 3 -> Member 4) ----
+# v2 adds ego-motion compensation -- see EgoOdometry below and
+# ros2_ws/interfaces.md SS6 for why `velocity` and `velocity_relative` are
+# two separate fields, not one.
+@dataclass
+class EgoOdometry:
+    linear_velocity: tuple     # (vx, vy, vz), ego frame, m/s
+    angular_velocity: tuple    # (wx, wy, wz), rad/s
+
 @dataclass
 class TrackedObject:
     track_id: int
-    cls: int                   # 1=static_obstacle, 2=dynamic_object
-    position: tuple             # (x, y, z)
-    velocity: tuple             # (vx, vy)
+    cls: int                      # same 6-class mapping as Segmentation (typically 1-5)
+    position: tuple                 # (x, y, z)
+    velocity: tuple                  # (vx, vy, vz) -- EGO-MOTION-COMPENSATED. is_dynamic is derived from this, never velocity_relative.
+    velocity_relative: tuple          # (vx, vy, vz) -- RAW, before compensation. Debugging/visualization only.
     is_dynamic: bool
     confidence: float
+    grid_range_bin: int = None          # set only by Fusion
+    grid_angular_bin: int = None        # set only by Fusion
 
 # ---- Stage 5: Fusion output (Member 4 -> Member 5's dashboard) ----
+# v2: Fusion does real reconciliation (mapping each object onto its grid
+# cell) rather than packaging grid + objects as two unlinked lists.
 @dataclass
 class FusedFrame:
     timestamp: float
@@ -59,7 +84,7 @@ class FusedFrame:
     metrics: dict                 # {"fps": float, "latency_ms": float, "miou": float, "compute_savings_pct": float}
 ```
 
-**Rule: nobody changes a field name, type, or shape here without telling everyone who consumes it, first.** If you need to change the contract, post it in the team chat, get explicit agreement from every affected member, update this file, *then* change your code — never the other way around.
+**Rule: nobody changes a field name, type, or shape here without telling everyone who consumes it, first.** If you need to change the contract, post it in the team chat, get explicit agreement from every affected member, update `ros2_ws/interfaces.md` and `shared/schemas.py`, *then* change your code — never the other way around.
 
 ---
 

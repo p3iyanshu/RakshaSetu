@@ -8,3 +8,20 @@ env/
 .DS_Store
 *.pptx
 *.zip
+
+# Node (dashboard/frontend)
+node_modules/
+dist/
+*.local
+
+# real dataset extracts used for local validation only -- never commit raw KITTI data
+tracking/kitti_validation_data/
+
+# raw LiDAR datasets + trained model artifacts (Member 1) -- never commit these
+data/semantickitti/
+data/nuscenes/
+data/carla/
+models/checkpoints/
+models/runs/
+*.pth
+*.onnx
