@@ -38,3 +38,8 @@ security/audit.log
 # build_tensorrt_engine.py, benchmark_*.py) -- built/measured artifacts,
 # GPU-specific in the .engine case, never source
 security/optimized/
+
+# colcon build output (ros2_ws/) -- generated locally by every builder, never source
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
