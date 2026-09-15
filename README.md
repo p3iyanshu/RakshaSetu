@@ -23,7 +23,7 @@ models/          Member 1: PointNet++ segmentation model, training, trained chec
 grid_engine/     Member 2: adaptive variable-resolution 2.5D grid engine
 tracking/        Member 3: clustering + Kalman/SORT tracking, ego-motion compensation
 ros2_ws/         Member 4: ROS 2 pipeline contract (interfaces.md) + integration workspace
-dashboard/       Member 5: FastAPI backend + React/Tailwind live visualization frontend
+dashboard/       Member 5: static vehicle perception dashboard (vanilla JS + canvas, no backend)
 team_tasks/      individual task briefs (and post-review corrections) for all 6 members
 ```
 
