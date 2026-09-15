@@ -1,7 +1,8 @@
-import PerceptionScene from "../components/live/PerceptionScene.jsx";
+import PerceptionView from "../components/perception/PerceptionView.jsx";
 
-/** Route-level wrapper, matching the CarView/AdminView pattern -- the
- * actual scene lives in components/live/PerceptionScene.jsx. */
+/** Route-level wrapper; the dashboard shell and perception scene live in
+ * components/perception/PerceptionView.jsx and use DashboardLayout's shared
+ * live-feed connection. */
 export default function LiveView() {
-  return <PerceptionScene />;
+  return <PerceptionView />;
 }

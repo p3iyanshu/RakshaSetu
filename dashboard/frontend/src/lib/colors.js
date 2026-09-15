@@ -34,6 +34,13 @@ export const CLASS_COLOR = {
 // separate from CLASS_COLOR since cyan never appears as a data value.
 export const SIGNAL = "#3ccbe8";
 
+// The two classes worth persisting in Live Perception's world buffer
+// (lib/perception/worldBuffer.js) -- real fixed geometry (walls/poles), as
+// opposed to drivable (the ambient default, not a discrete thing to
+// remember), dynamic classes (movers -- persisting them would be wrong),
+// or unclassified (ambiguous, could be either).
+export const STATIC_OBSTACLE_CLASSES = new Set([CLASS.STATIC_OBSTACLE_WALL, CLASS.STATIC_OBSTACLE_POLE]);
+
 export function hexToRgb(hex) {
   const v = hex.replace("#", "");
   const n = parseInt(v, 16);

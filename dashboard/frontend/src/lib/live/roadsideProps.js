@@ -2,10 +2,9 @@
 // Top-Down LiDAR sweep and Vehicle HUD. The real data contract only carries
 // {drivable, wall, pole, vehicle, pedestrian, unknown} per grid cell/object
 // (see lib/colors.js's CLASS) -- it has no distinct "tree" or "curb" or
-// "pothole" class, so these props are deliberately decorative scenery, the
-// same kind of non-data flavor components/live/RoadEnvironment.jsx already
-// adds elsewhere in this app. A fixed seed keeps the same layout across
-// reloads instead of reshuffling the scene on every mount.
+// "pothole" class, so these props are deliberately decorative scenery. A
+// fixed seed keeps the same layout across reloads instead of reshuffling the
+// scene on every mount.
 function mulberry32(seed) {
   let a = seed;
   return function rand() {

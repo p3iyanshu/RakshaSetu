@@ -34,6 +34,7 @@ import os
 import sys
 from typing import Literal, Optional
 
+import psutil
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError
@@ -72,6 +73,20 @@ _mock = MockFeedGenerator()
 # Admin override for which source to serve, set via /api/admin/feed-mode.
 # None means "auto" -- the original real-if-present-else-mock behavior.
 _forced_mode: Optional[Literal["real", "mock"]] = None
+
+# This backend process's own RSS -- real, live, and necessarily computed at
+# serve time (not something the offline precompute could have baked into
+# demo_sequence.json, since that would be the precompute script's memory
+# usage, not this server's). Live Perception's MEMORY USAGE stat reads this.
+_this_process = psutil.Process()
+
+
+def _with_live_metrics(frame: dict) -> dict:
+    frame = dict(frame)
+    metrics = dict(frame.get("metrics") or {})
+    metrics["memory_mb"] = _this_process.memory_info().rss / 1e6
+    frame["metrics"] = metrics
+    return frame
 
 
 # ---------------------------------------------------------------------------
@@ -225,10 +240,10 @@ def initial_state(_claims: dict = Depends(require_role())):
     if mode == "real":
         meta = dict(real["meta"])
         meta["mode"] = "real"
-        return {"meta": meta, "frame": _sanitize_frame(real["frames"][0])}
+        return {"meta": meta, "frame": _sanitize_frame(_with_live_metrics(real["frames"][0]))}
     meta = dict(_mock.meta)
     meta["mode"] = "mock"
-    return {"meta": meta, "frame": _sanitize_frame(_mock.next_frame())}
+    return {"meta": meta, "frame": _sanitize_frame(_with_live_metrics(_mock.next_frame()))}
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +330,7 @@ async def _stream_real(websocket: WebSocket, real: dict):
 
     while True:
         frame = frames[i]
-        await websocket.send_json({"type": "frame", "frame": _sanitize_frame(frame)})
+        await websocket.send_json({"type": "frame", "frame": _sanitize_frame(_with_live_metrics(frame))})
 
         nxt = frames[(i + 1) % n]
         try:
@@ -336,7 +351,7 @@ async def _stream_mock(websocket: WebSocket):
     await websocket.send_json({"type": "meta", "meta": meta})
     while True:
         frame = _mock.next_frame()
-        await websocket.send_json({"type": "frame", "frame": _sanitize_frame(frame)})
+        await websocket.send_json({"type": "frame", "frame": _sanitize_frame(_with_live_metrics(frame))})
         await asyncio.sleep(MOCK_FRAME_DELAY)
 
 

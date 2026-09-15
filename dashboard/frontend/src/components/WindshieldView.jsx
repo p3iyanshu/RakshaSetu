@@ -27,9 +27,8 @@ export function nearestAheadHazard(objects = []) {
  * non-drivable ground and motion trails, using genuine (radius, heading)
  * projections of the live grid -- nothing here is illustrative. Discrete
  * obstacles (walls, poles, vehicles, humans, potholes...) are rendered as
- * DOM icon overlays by the view (see VehicleHudView + SemanticMarker), the
- * same terrain/icon split components/live/ already uses for the Live scene,
- * so this canvas only ever draws the ground itself.
+ * DOM icon overlays by the view (see CarView + SemanticMarker), so this
+ * canvas only ever draws the ground itself.
  */
 export default function WindshieldView({ cells, trails = new Map(), objects = [], width = 800, height = 480, background = "#0a1213" }) {
   const canvasRef = useRef(null);
