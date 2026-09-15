@@ -24,6 +24,10 @@ export function createSemanticLegend(container) {
             <span class="legend-label">Static Pole</span>
           </div>
           <div class="legend-item">
+            <span class="legend-dot dot-tree"></span>
+            <span class="legend-label">Static Tree</span>
+          </div>
+          <div class="legend-item">
             <span class="legend-dot dot-vehicle"></span>
             <span class="legend-label">Dynamic Vehicle</span>
           </div>

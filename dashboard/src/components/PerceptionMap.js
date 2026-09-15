@@ -792,6 +792,45 @@ function drawPerceptionEntities(ctx, egoBaseX, egoBaseY, scale, objects, selecte
       ctx.arc(ox, oy, 8, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+    } else if (obj.class === 'static_tree') {
+      // Flat 2D Static Tree Marker (Green canopy circle over a short brown trunk)
+      ctx.save();
+      ctx.fillStyle = '#5c3a21';
+      ctx.fillRect(ox - 1, oy + 3, 2, 6);
+
+      ctx.fillStyle = '#15803d';
+      ctx.strokeStyle = isSelected ? '#ffffff' : '#00e676';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(0, 230, 118, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.arc(ox, oy, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    } else if (obj.class === 'static_wall') {
+      // Flat Technical Wall Segment Marker (short red bar, perpendicular to the road)
+      ctx.save();
+      ctx.strokeStyle = isSelected ? '#ffffff' : '#ef4444';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(ox - 9, oy);
+      ctx.lineTo(ox + 9, oy);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(ox - 13, oy);
+      ctx.lineTo(ox + 13, oy);
+      ctx.stroke();
+      ctx.restore();
     } else if (obj.class === 'curb') {
       // Flat Cyan Point Marker
       ctx.save();
@@ -943,6 +982,11 @@ function updateOverlayCallouts(overlayLayer, egoBaseX, egoBaseY, scale, objects,
       headerColor = '#ef4444';
       offsetX = 18;
       offsetY = -24;
+    } else if (obj.class === 'static_tree') {
+      borderClass = 'border-green text-green';
+      headerColor = '#00e676';
+      offsetX = 18;
+      offsetY = -26;
     } else if (obj.class === 'curb') {
       borderClass = 'border-cyan text-cyan';
       headerColor = '#00f2fe';

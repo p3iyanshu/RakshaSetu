@@ -62,6 +62,7 @@ html, body {
 .font-mono { font-family: var(--font-mono); }
 .font-semibold { font-weight: 600; }
 .text-cyan { color: var(--text-cyan) !important; }
+.text-green { color: var(--text-green) !important; }
 .text-yellow { color: var(--text-yellow) !important; }
 .text-orange { color: var(--text-orange) !important; }
 .text-red { color: var(--text-red) !important; }
@@ -406,6 +407,7 @@ html, body {
 .dot-pole { background: var(--color-pole); box-shadow: 0 0 6px var(--color-pole); }
 .dot-vehicle { background: var(--color-yellow); box-shadow: 0 0 6px var(--color-yellow); }
 .dot-human { background: var(--color-orange); box-shadow: 0 0 6px var(--color-orange); }
+.dot-tree { background: var(--color-green); box-shadow: 0 0 6px var(--color-green); }
 .dot-unclassified { background: var(--color-gray); box-shadow: 0 0 4px var(--color-gray); }
 
 /* ==========================================================================
@@ -511,6 +513,7 @@ html, body {
 .border-purple { border-color: var(--color-purple); }
 .border-red { border-color: var(--color-red); }
 .border-cyan { border-color: var(--color-cyan); }
+.border-green { border-color: var(--color-green); }
 
 /* Interactive Hover Tooltip */
 .map-hover-tooltip {

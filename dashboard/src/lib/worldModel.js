@@ -24,6 +24,8 @@ export class WorldModel {
       { track_id: '09', name: 'POLE #09', class: 'static_pole', ui_class: 'Static Pole', stationS: 62.0, lateralOffset: 7.2, confidence: 0.94, is_dynamic: false },
       // Left Wall Boundary (x=-10.8m)
       { track_id: 'wall_1', name: 'WALL', class: 'static_wall', ui_class: 'Static Wall', stationS: 42.0, lateralOffset: -10.8, confidence: 0.98, is_dynamic: false },
+      // Tree #13 on Left Sidewalk (x=-8.5m)
+      { track_id: '13', name: 'TREE #13', class: 'static_tree', ui_class: 'Static Tree', stationS: 48.0, lateralOffset: -8.5, confidence: 0.92, is_dynamic: false },
 
       // Section 2: Pothole & Curb Section
       // Pole #14 on Left Sidewalk (x=-7.0m)
@@ -36,6 +38,8 @@ export class WorldModel {
       { track_id: '17', name: 'POLE #17', class: 'static_pole', ui_class: 'Static Pole', stationS: 126.0, lateralOffset: 7.2, confidence: 0.95, is_dynamic: false },
       // Curb Tag on Right Barrier (x=+5.8m)
       { track_id: 'curb', name: 'CURB', class: 'curb', ui_class: 'Curb', stationS: 130.0, lateralOffset: 5.8, confidence: 0.96, is_dynamic: false },
+      // Tree #20 on Left Sidewalk (x=-8.0m)
+      { track_id: '20', name: 'TREE #20', class: 'static_tree', ui_class: 'Static Tree', stationS: 98.0, lateralOffset: -8.0, confidence: 0.9, is_dynamic: false },
 
       // Section 3: Left Turn Intersection
       // Pole #22 on Left Sidewalk (x=-7.0m)
@@ -43,7 +47,11 @@ export class WorldModel {
       // Human #23: Frozen on right sidewalk near corner (x=+5.2m, velocity 0.0 m/s)
       { track_id: '23', name: 'HUMAN #23', class: 'dynamic_human', ui_class: 'Dynamic Human', stationS: 212.0, lateralOffset: 5.2, confidence: 0.85, is_dynamic: false },
       // Corner Wall Tag (x=-10.8m)
-      { track_id: 'wall_turn', name: 'WALL', class: 'static_wall', ui_class: 'Static Wall', stationS: 238.0, lateralOffset: -10.8, confidence: 0.98, is_dynamic: false }
+      { track_id: 'wall_turn', name: 'WALL', class: 'static_wall', ui_class: 'Static Wall', stationS: 238.0, lateralOffset: -10.8, confidence: 0.98, is_dynamic: false },
+      // Tree #25 on Right Sidewalk near the corner (x=+6.5m)
+      { track_id: '25', name: 'TREE #25', class: 'static_tree', ui_class: 'Static Tree', stationS: 225.0, lateralOffset: 6.5, confidence: 0.93, is_dynamic: false },
+      // Tree #27 on Left Sidewalk during the dynamic-turn stretch (x=-8.0m)
+      { track_id: '27', name: 'TREE #27', class: 'static_tree', ui_class: 'Static Tree', stationS: 275.0, lateralOffset: -8.0, confidence: 0.91, is_dynamic: false }
     ];
 
     // Dynamic Traffic (ONLY VEHICLES MOVE)

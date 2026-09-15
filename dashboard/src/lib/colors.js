@@ -7,6 +7,7 @@ export const SEMANTIC_COLORS = {
   drivable: '#00e676',       // Bright green for road / drivable corridor
   static_wall: '#ef4444',    // Bright red for static walls / barriers
   static_pole: '#ff5252',    // Coral / Salmon red for static poles
+  static_tree: '#00e676',    // Green canopy for static trees
   dynamic_vehicle: '#facc15',// Bright vibrant yellow for dynamic vehicles
   dynamic_human: '#f97316',  // Vivid orange for human / pedestrians
   unclassified: '#64748b',   // Slate gray for unclassified / unknown

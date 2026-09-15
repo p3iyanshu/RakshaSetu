@@ -32,6 +32,7 @@ const DEFAULTS = {
     dynamic_human: { selected: 0.05, terrain: 0.03 },
     static_wall: { selected: 1.20, terrain: 0.05 },
     static_pole: { selected: 0.95, terrain: 0.04 },
+    static_tree: { selected: 2.6, terrain: 0.05 },
     default: { selected: 0.12, terrain: 0.03 }
   },
   metricsBaseline: {

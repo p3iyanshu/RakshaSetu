@@ -212,6 +212,68 @@
   overflow: hidden;
   height: 100%;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  gap: 8px;
+}
+
+.lidar-feed-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.lidar-feed-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #fff;
+}
+
+.lidar-feed-stats {
+  font-size: 11.5px;
+  color: var(--text-cyan);
+}
+
+.lidar-feed-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: radial-gradient(circle at 50% 100%, rgba(0, 242, 254, 0.06) 0%, transparent 65%), var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lidar-feed-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lidar-feed-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.lidar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
+.lidar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .admin-event-list {

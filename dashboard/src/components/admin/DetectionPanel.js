@@ -1,12 +1,11 @@
 /**
  * Admin Console — Detection Panel (default main-screen view)
- * Basic vehicle information, the same live 2.5D perception map renderer
- * used on the main dashboard (so "what data points are being converted
- * into the map" is literally the same map, not a re-implementation),
- * and a detection log driven off the actual frame data.
+ * Basic vehicle information, the live LiDAR point-cloud feed (raw
+ * classified data points, not the main dashboard's filled road/vehicle
+ * graphics), and a detection log driven off the actual frame data.
  */
 
-import { createPerceptionMap } from '../PerceptionMap.js';
+import { createLidarFeedPanel } from './LidarFeedPanel.js';
 
 export function createDetectionPanel(container) {
   container.innerHTML = `
@@ -27,14 +26,14 @@ export function createDetectionPanel(container) {
         </div>
       </div>
 
-      <div class="admin-map-card" id="admin-map-mount"></div>
+      <div class="admin-map-card" id="admin-lidar-feed-mount"></div>
     </div>
   `;
 
   const basicInfoElem = container.querySelector('#admin-basic-info-body');
   const logElem = container.querySelector('#admin-detection-log');
-  const mapMount = container.querySelector('#admin-map-mount');
-  const perceptionMap = createPerceptionMap(mapMount, () => {});
+  const lidarFeedMount = container.querySelector('#admin-lidar-feed-mount');
+  const lidarFeed = createLidarFeedPanel(lidarFeedMount);
 
   let previousTrackIds = new Set();
   const events = [];
@@ -100,9 +99,7 @@ export function createDetectionPanel(container) {
         </div>
       `;
 
-      // Pass null (not undefined) when untracked so the map actually clears
-      // any previously-selected vehicle's highlight instead of leaving it stuck.
-      perceptionMap.update(frame, vehicle.trackId || null);
+      lidarFeed.update(frame);
 
       const currentIds = new Set(frame.objects.map((o) => String(o.track_id)));
       frame.objects.forEach((o) => {
@@ -113,7 +110,7 @@ export function createDetectionPanel(container) {
       previousTrackIds = currentIds;
     },
     destroy() {
-      perceptionMap.destroy();
+      lidarFeed.destroy();
     }
   };
 }
