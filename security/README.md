@@ -195,28 +195,38 @@ out while diagnosing the bug above.
 ```bash
 source /opt/ros/humble/setup.bash
 source ros2_ws/install/setup.bash    # colcon build first if this doesn't exist yet
-python3 security/integration_test_ros2_pipeline.py            # SROS2 enforced (default)
-python3 security/integration_test_ros2_pipeline.py --no-security --frames 5
+python3 security/integration_test_ros2_pipeline.py                 # SROS2 enforced (default)
+python3 security/integration_test_ros2_pipeline.py --no-security --timeout-s 20
 ```
 
 Launches the 7 REAL pipeline nodes (no mocks -- the actual
 segmentation/grid/tracking/fusion wrappers around Members 1-3's code) as
-subprocesses, plays the role of carla-ros-bridge by publishing real
-SemanticKITTI LiDAR scans as `sensor_msgs/PointCloud2` on the exact
-topic/byte layout carla-ros-bridge's own lidar sensor uses, and confirms
-real, well-formed, NaN/Inf-free frames come out `/rakshasetu/fusion/output`
--- both with and without SROS2 enforced. Verified passing both ways.
+subprocesses and confirms real, well-formed, NaN/Inf-free frames come out
+`/rakshasetu/fusion/output`. `lidar_ingest_node`/`ego_odometry_node`
+self-publish from `shared/mock_data.py`'s real 20-frame scene on their own
+timers (see those nodes' own "SWAP FOR REAL DATA LATER" docstrings) --
+nothing else needs to be injected.
 
-**Scope, stated honestly:** `lidar_ingest_node`/`ego_odometry_node` now
-subscribe directly to carla-ros-bridge's own topics, so a literal live-CARLA
-run needs the actual simulator + bridge running, which wasn't available in
-this environment (a ~20GB GPU-rendered simulator, cross-boundary between
-this WSL ROS 2 install and the Windows-side CARLA binary). This script
-substitutes a real recorded LiDAR scan for the live sensor feed -- it
-proves the pipeline's wiring, topic contracts, and security layer all work
-correctly end to end, but does not verify carla-ros-bridge's own
-`PointCloud2` encoding matches this script's assumption byte-for-byte.
-That remains the one gap before a true live-CARLA rehearsal.
+**Status, stated honestly (2026-09-15/16):** the SROS2 keystore +
+`ROS_SECURITY_ENCLAVE_OVERRIDE` fix documented above **is verified** --
+confirmed working end to end with real pipeline nodes and real data,
+security enforced. The script above, in its current form, has **not yet
+been cleanly re-verified** against `feature/ros2-integration` specifically:
+an earlier version of this test was verified against a since-discovered
+*stale, uncommitted* copy of `ros2_ws/src` that turned out to differ from
+the canonical branch (different wire-schema module -- `topics.py` vs.
+`schemas.py` -- though the same topic names, node names, and JSON-over-
+`std_msgs/String` approach). This script has been rewritten to match
+`schemas.py`'s actual contract, but a clean confirmation run was
+interrupted mid-session by discovering ANOTHER concurrent session's live
+CARLA simulation + `carla_ros_bridge` actively running on the same
+`ROS_DOMAIN_ID` on this shared machine -- re-running node launches
+alongside it risked cross-talk contaminating both runs' results, so
+testing was paused to avoid disrupting what may be today's hackathon
+rehearsal. **Next step, not yet done:** either re-run this script with
+`ROS_DOMAIN_ID` set to something other than the live demo's, or coordinate
+a window when the domain is free, then update this section with a real
+confirmed pass/fail against `feature/ros2-integration`.
 
 ## What's intentionally not here (yet)
 
