@@ -12,18 +12,18 @@
 
   <!-- Shared dashboard theme + admin-specific layout -->
   <link rel="stylesheet" href="./styles/dashboard.css?v=1">
-  <link rel="stylesheet" href="./styles/admin.css?v=1">
+  <link rel="stylesheet" href="./styles/admin.css?v=2">
 </head>
-<body class="admin-body">
+<body>
   <div class="admin-container">
     <div id="admin-header-mount"></div>
 
-    <main class="admin-main">
-      <section id="monitoring-mount"></section>
-      <section id="config-mount"></section>
-    </main>
+    <div class="admin-body-layout">
+      <aside id="admin-sidebar-mount" class="admin-sidebar"></aside>
+      <main id="admin-content-mount" class="admin-content"></main>
+    </div>
   </div>
 
-  <script type="module" src="./src/admin.js?v=1"></script>
+  <script type="module" src="./src/admin.js?v=2"></script>
 </body>
 </html>

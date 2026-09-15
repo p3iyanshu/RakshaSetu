@@ -1,37 +1,59 @@
 /**
  * RakshaSetu Admin Console Orchestrator
- * Runs its own instance of the deterministic world simulation (so the
- * monitoring view is live even without the main dashboard tab open) and
- * hosts the editable configuration forms.
+ * Sidebar-driven: pick a vehicle from the fleet list, then switch between
+ * its live Detection Panel (perception map + basic info + detection log)
+ * and its Accident Records. Runs its own world-simulation instance so the
+ * Detection Panel is live even without the main dashboard tab open.
  */
 
 import { WORLD_MODEL } from './lib/worldModel.js';
-import { CONFIG, onConfigChange } from './lib/config.js';
+import { CONFIG } from './lib/config.js';
+import { VEHICLES } from './lib/vehicleRecords.js';
 import { createAdminHeader } from './components/admin/AdminHeader.js';
-import { createMonitoringPanel } from './components/admin/MonitoringPanel.js';
-import { createConfigPanel } from './components/admin/ConfigPanel.js';
+import { createSidebar } from './components/admin/Sidebar.js';
+import { createDetectionPanel } from './components/admin/DetectionPanel.js';
+import { createAccidentRecords } from './components/admin/AccidentRecords.js';
 
 class AdminApp {
   constructor() {
     this.distanceTraveled = 0.0;
     this.lastFrameTime = performance.now();
+    this.selectedVehicle = VEHICLES[0];
+    this.activeView = 'detection';
 
     this.header = createAdminHeader(document.getElementById('admin-header-mount'));
-    this.monitoring = createMonitoringPanel(document.getElementById('monitoring-mount'));
-    this.configPanel = createConfigPanel(document.getElementById('config-mount'));
+    this.sidebar = createSidebar(document.getElementById('admin-sidebar-mount'), {
+      vehicles: VEHICLES,
+      onSelectVehicle: (vehicle) => {
+        this.selectedVehicle = vehicle;
+        if (this.activeView === 'accidents') this.accidentRecords?.update(this.selectedVehicle);
+      },
+      onNavChange: (view) => {
+        this.activeView = view;
+        this.mountActiveView();
+      }
+    });
 
-    // Reflect edits made in this tab or synced in from another tab.
-    onConfigChange(() => this.configPanel.refresh());
+    this.contentMount = document.getElementById('admin-content-mount');
+    this.detectionPanel = null;
+    this.accidentRecords = null;
+    this.mountActiveView();
 
-    this.renderFrame(0.0);
     this.startRenderLoop();
   }
 
-  renderFrame(distS) {
-    const frame = WORLD_MODEL.sampleAtDistance(distS, performance.now() / 1000.0);
-    if (!frame) return;
-    this.header.update(frame.scene);
-    this.monitoring.update(frame);
+  mountActiveView() {
+    this.detectionPanel?.destroy?.();
+    this.contentMount.innerHTML = '';
+    this.detectionPanel = null;
+    this.accidentRecords = null;
+
+    if (this.activeView === 'accidents') {
+      this.accidentRecords = createAccidentRecords(this.contentMount);
+      this.accidentRecords.update(this.selectedVehicle);
+    } else {
+      this.detectionPanel = createDetectionPanel(this.contentMount);
+    }
   }
 
   startRenderLoop() {
@@ -39,7 +61,13 @@ class AdminApp {
       const deltaSec = (now - this.lastFrameTime) / 1000.0;
       this.lastFrameTime = now;
       this.distanceTraveled += CONFIG.egoSpeedMps * deltaSec;
-      this.renderFrame(this.distanceTraveled);
+
+      const frame = WORLD_MODEL.sampleAtDistance(this.distanceTraveled, now / 1000.0);
+      this.header.update(frame.scene);
+      if (this.activeView === 'detection' && this.detectionPanel) {
+        this.detectionPanel.update(frame, this.selectedVehicle);
+      }
+
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);

@@ -2,32 +2,33 @@
    RakshaSetu Admin Console — layout on top of dashboard.css's theme tokens
    ========================================================================== */
 
-/* admin.css only loads on admin.html, so overriding html/body directly is safe */
-html,
-body {
-  height: auto;
-  min-height: 100vh;
-  overflow-y: auto;
-}
-
 .admin-container {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   width: 100vw;
-  padding: 8px 10px 24px;
-  gap: 10px;
+  padding: 8px 10px;
+  gap: 8px;
   background: radial-gradient(circle at 50% 30%, rgba(0, 242, 254, 0.04) 0%, transparent 60%), #03060c;
 }
 
-.admin-main {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.admin-body-layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
 }
 
-.admin-card {
-  padding: 14px 16px;
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.admin-content {
+  min-height: 0;
 }
 
 .admin-subtitle {
@@ -39,116 +40,184 @@ body {
   margin-bottom: 8px;
 }
 
-/* --- Monitoring --- */
-
-.admin-monitoring-body {
-  gap: 14px;
-}
-
-.admin-scene-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  padding: 8px 10px;
-  background: var(--bg-card-inner);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  font-size: 11.5px;
-  color: var(--text-primary);
-}
-
-.admin-scene-strip b {
+.admin-empty-state {
+  padding: 14px 10px;
   color: var(--text-muted);
-  font-weight: 600;
-  margin-right: 4px;
+  font-size: 11.5px;
+  text-align: center;
 }
 
-.admin-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+/* --- Sidebar: Fleet search + list --- */
+
+.admin-fleet-card {
+  flex: 1;
+  min-height: 0;
 }
 
-.admin-metric-tile {
+.admin-fleet-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+
+.admin-search-input {
   background: var(--bg-card-inner);
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
+  color: #fff;
+  font-size: 11.5px;
+  padding: 7px 9px;
+  outline: none;
+  flex-shrink: 0;
 }
 
-.admin-metric-label {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-  text-transform: uppercase;
+.admin-search-input:focus {
+  border-color: var(--border-active);
 }
 
-.admin-metric-value {
-  font-size: 17px;
+.admin-vehicle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.admin-vehicle-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 9px;
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-main);
+}
+
+.admin-vehicle-row:hover {
+  border-color: var(--border-card-hover);
+}
+
+.admin-vehicle-row.selected {
+  border-color: var(--border-active);
+  background: rgba(0, 242, 254, 0.08);
+}
+
+.admin-vehicle-number {
+  font-size: 12px;
   font-weight: 700;
   color: #fff;
 }
 
-.admin-sparkline {
-  width: 100%;
-  height: 26px;
-  display: block;
+.admin-vehicle-make {
+  font-size: 10px;
+  color: var(--text-secondary);
 }
 
-.admin-split {
+.admin-vehicle-badge {
+  margin-top: 3px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.admin-vehicle-badge.live {
+  color: #00e676;
+  background: rgba(0, 230, 118, 0.12);
+}
+
+.admin-vehicle-badge.offline {
+  color: var(--text-muted);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+/* --- Sidebar: View nav --- */
+
+.admin-nav-card {
+  flex-shrink: 0;
+}
+
+.admin-nav-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-nav-btn {
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.admin-nav-btn:hover {
+  border-color: var(--border-card-hover);
+  color: var(--text-primary);
+}
+
+.admin-nav-btn.active {
+  background: rgba(0, 242, 254, 0.1);
+  border-color: var(--border-active);
+  color: var(--text-cyan);
+}
+
+/* --- Detection Panel --- */
+
+.admin-detection-grid {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 14px;
+  grid-template-columns: 260px 1fr;
+  gap: 8px;
+  height: 100%;
   min-height: 0;
 }
 
-.admin-table-scroll {
-  max-height: 260px;
+.admin-detection-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.admin-basic-info-card {
+  flex-shrink: 0;
+}
+
+.admin-log-card {
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-log-card .card-body {
   overflow-y: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  gap: 6px;
 }
 
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-}
-
-.admin-table thead th {
-  position: sticky;
-  top: 0;
-  background: #0b1424;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  font-size: 9.5px;
-  letter-spacing: 0.4px;
-  text-align: left;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.admin-table tbody td {
-  padding: 5px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.admin-table tbody tr:hover {
-  background: var(--bg-card-hover);
+.admin-map-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
 }
 
 .admin-event-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 260px;
-  overflow-y: auto;
 }
 
 .admin-event-row {
@@ -178,92 +247,76 @@ body {
   color: var(--text-primary);
 }
 
-/* --- Configuration --- */
+/* --- Accident Records --- */
 
-.admin-config-body {
-  gap: 16px;
+.admin-accidents-card {
+  height: 100%;
 }
 
-.admin-config-section {
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border-subtle);
+.admin-accidents-body {
+  overflow-y: auto;
+  gap: 8px;
 }
 
-.admin-config-section:last-of-type {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.admin-field-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.admin-field-pair {
-  display: contents;
-}
-
-.admin-field {
+.admin-accident-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 10.5px;
-  color: var(--text-secondary);
-}
-
-.admin-field input {
+  gap: 12px;
+  padding: 10px;
   background: var(--bg-card-inner);
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
-  color: #fff;
-  font-family: var(--font-mono);
+}
+
+.admin-accident-date {
+  flex-shrink: 0;
+  width: 82px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.admin-accident-cause {
   font-size: 12px;
-  padding: 6px 8px;
-  outline: none;
+  color: var(--text-primary);
+  margin-bottom: 5px;
 }
 
-.admin-field input:focus {
-  border-color: var(--border-active);
-}
-
-.admin-btn {
-  background: rgba(0, 242, 254, 0.08);
-  border: 1px solid rgba(0, 242, 254, 0.4);
-  color: #00f2fe;
+.admin-accident-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.admin-severity-badge {
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.6px;
-  padding: 7px 14px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
 }
 
-.admin-btn:hover {
-  background: rgba(0, 242, 254, 0.16);
+.admin-severity-badge.severity-minor {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.12);
 }
 
-.admin-btn-applied {
-  background: rgba(0, 230, 118, 0.16) !important;
-  border-color: rgba(0, 230, 118, 0.5) !important;
-  color: #00e676 !important;
+.admin-severity-badge.severity-moderate {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.12);
 }
 
-.admin-btn-danger {
-  margin-top: 4px;
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.4);
+.admin-severity-badge.severity-severe {
   color: #ef4444;
-}
-
-.admin-btn-danger:hover {
-  background: rgba(239, 68, 68, 0.16);
+  background: rgba(239, 68, 68, 0.12);
 }
 
 @media (max-width: 900px) {
-  .admin-split {
+  .admin-body-layout {
+    grid-template-columns: 1fr;
+  }
+  .admin-detection-grid {
     grid-template-columns: 1fr;
   }
 }
