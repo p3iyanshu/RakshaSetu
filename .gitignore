@@ -38,3 +38,8 @@ security/audit.log
 # build_tensorrt_engine.py, benchmark_*.py) -- built/measured artifacts,
 # GPU-specific in the .engine case, never source
 security/optimized/
+
+# SROS2 keystore (security/generate_sros2_keystore.sh) -- contains real
+# private keys (enclaves/*/key.pem, private/ca.key.pem); never commit a
+# keystore, regenerate it locally instead
+security/sros2_keystore/

@@ -148,11 +148,80 @@ in this environment. The `.onnx` file is portable to one; the `.engine`
 file is **not** (TensorRT engines are tied to the exact GPU/driver/TensorRT
 version that built them) and would need rebuilding on the target device.
 
+## SROS2: encrypted, authenticated ROS 2 node-to-node traffic
+
+Was blocked all week on Member 4's ROS 2 nodes existing; they now do
+(`ros2_ws/src/rakshasetu/`), so this is done.
+
+```bash
+source /opt/ros/humble/setup.bash   # or wherever your ROS 2 Humble install is
+bash security/generate_sros2_keystore.sh
+```
+Creates `security/sros2_keystore/` (gitignored -- real private keys) with one
+enclave per pipeline node (`lidar_ingest_node`, `preprocessing_node`,
+`ego_odometry_node`, `segmentation_node`, `grid_engine_node`, `tracking_node`,
+`fusion_node`) plus `integration_test_harness` for the test below. Prints the
+exact `ROS_SECURITY_*` env vars to export before `ros2 launch`.
+
+**A real bug found and fixed while verifying this actually works, not just
+that the keystore generates:** on the ROS 2 Humble build this was tested
+against, matching a node to its enclave by the node's own fully-qualified
+name alone (the normally-documented default) silently did NOT work --
+every node resolved to the keystore's ROOT enclave instead (which has no
+`cert.pem`/`key.pem` of its own) and failed to start with `rcl`'s generic
+`"couldn't find all security files!"` error. Root-caused by running with
+`ROS_SECURITY_ENCLAVE_OVERRIDE` explicitly set per node and observing the
+`rcl` log line change from `Found security directory: .../enclaves` (wrong
+-- the keystore root) to `.../enclaves/<node_name>` (right). Fixed at the
+source: `ros2_ws/src/rakshasetu/launch/rakshasetu.launch.py` now sets
+`additional_env={"ROS_SECURITY_ENCLAVE_OVERRIDE": f"/{name}"}` on every
+`Node` action -- inert when security is off, required when it's on. If you
+run a node directly with `ros2 run` instead of through that launch file,
+set the same env var yourself (the generation script's own printed output
+reminds you).
+
+**Note on the keystore's location:** it lives under `security/` in this
+repo for convenience, but if your ROS 2 install's security plugin reports
+the same opaque "couldn't find all security files" error even after
+setting `ROS_SECURITY_ENCLAVE_OVERRIDE` correctly, regenerate the keystore
+onto your OS's native filesystem instead of a Windows-drive/network mount
+(e.g. WSL's `/mnt/*` DrvFs) and point `ROS_SECURITY_KEYSTORE` there --
+some filesystem/security-plugin combinations behave inconsistently with
+keystores on a non-native mount, and this was one of the first things ruled
+out while diagnosing the bug above.
+
+## Full ROS 2 pipeline integration test
+
+```bash
+source /opt/ros/humble/setup.bash
+source ros2_ws/install/setup.bash    # colcon build first if this doesn't exist yet
+python3 security/integration_test_ros2_pipeline.py            # SROS2 enforced (default)
+python3 security/integration_test_ros2_pipeline.py --no-security --frames 5
+```
+
+Launches the 7 REAL pipeline nodes (no mocks -- the actual
+segmentation/grid/tracking/fusion wrappers around Members 1-3's code) as
+subprocesses, plays the role of carla-ros-bridge by publishing real
+SemanticKITTI LiDAR scans as `sensor_msgs/PointCloud2` on the exact
+topic/byte layout carla-ros-bridge's own lidar sensor uses, and confirms
+real, well-formed, NaN/Inf-free frames come out `/rakshasetu/fusion/output`
+-- both with and without SROS2 enforced. Verified passing both ways.
+
+**Scope, stated honestly:** `lidar_ingest_node`/`ego_odometry_node` now
+subscribe directly to carla-ros-bridge's own topics, so a literal live-CARLA
+run needs the actual simulator + bridge running, which wasn't available in
+this environment (a ~20GB GPU-rendered simulator, cross-boundary between
+this WSL ROS 2 install and the Windows-side CARLA binary). This script
+substitutes a real recorded LiDAR scan for the live sensor feed -- it
+proves the pipeline's wiring, topic contracts, and security layer all work
+correctly end to end, but does not verify carla-ros-bridge's own
+`PointCloud2` encoding matches this script's assumption byte-for-byte.
+That remains the one gap before a true live-CARLA rehearsal.
+
 ## What's intentionally not here (yet)
 
-- SROS2 keystores for ROS 2 node-to-node traffic -- blocked on Member 4's
-  ROS 2 nodes existing (`ros2 security create_keystore` needs a running
-  workspace to point at).
 - FP16/INT8 TensorRT precision, a Jetson deployment test, the fallback
   demo video -- separate items on Member 6's checklist, not part of this
   pass.
+- A live-CARLA run of the integration test above (see that section's
+  "scope, stated honestly").
