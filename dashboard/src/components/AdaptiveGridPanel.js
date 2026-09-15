@@ -1,7 +1,23 @@
 /**
  * Adaptive Grid (Foveated) Panel Component
  * Displays the Range vs. Cell Size table with cyan cell size values.
+ * Rows come from CONFIG.grid (see lib/config.js) so the admin console
+ * can retune the resolution table live.
  */
+
+import { CONFIG } from '../lib/config.js';
+
+function renderRows() {
+  return CONFIG.grid
+    .map(
+      (row) => `
+          <div class="foveated-row">
+            <span class="range-val font-mono">${row.range}</span>
+            <span class="cellsize-val font-mono text-cyan">${row.cellSize}</span>
+          </div>`
+    )
+    .join('');
+}
 
 export function createAdaptiveGridPanel(container) {
   container.innerHTML = `
@@ -15,31 +31,16 @@ export function createAdaptiveGridPanel(container) {
           <span class="cross-icon">✕</span>
           <span>Cell Size</span>
         </div>
-        <div class="foveated-table-rows">
-          <div class="foveated-row">
-            <span class="range-val font-mono">0 - 10 m</span>
-            <span class="cellsize-val font-mono text-cyan">5 cm</span>
-          </div>
-          <div class="foveated-row">
-            <span class="range-val font-mono">10 - 30 m</span>
-            <span class="cellsize-val font-mono text-cyan">15 cm</span>
-          </div>
-          <div class="foveated-row">
-            <span class="range-val font-mono">30 - 60 m</span>
-            <span class="cellsize-val font-mono text-cyan">30 cm</span>
-          </div>
-          <div class="foveated-row">
-            <span class="range-val font-mono">60 - 120 m</span>
-            <span class="cellsize-val font-mono text-cyan">50 cm</span>
-          </div>
-        </div>
+        <div class="foveated-table-rows" id="foveated-table-rows">${renderRows()}</div>
       </div>
     </div>
   `;
 
+  const rowsElem = container.querySelector('#foveated-table-rows');
+
   return {
     update() {
-      // Static specification table
+      if (rowsElem) rowsElem.innerHTML = renderRows();
     }
   };
 }

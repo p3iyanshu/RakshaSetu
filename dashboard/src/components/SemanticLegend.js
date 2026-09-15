@@ -28,6 +28,10 @@ export function createSemanticLegend(container) {
             <span class="legend-label">Dynamic Vehicle</span>
           </div>
           <div class="legend-item">
+            <span class="legend-dot dot-human"></span>
+            <span class="legend-label">Human</span>
+          </div>
+          <div class="legend-item">
             <span class="legend-dot dot-unclassified"></span>
             <span class="legend-label">Unclassified</span>
           </div>

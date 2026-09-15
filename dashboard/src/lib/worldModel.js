@@ -7,6 +7,8 @@
  * FIX 4: Only vehicles are dynamic. Humans, poles, walls, and potholes are strictly STATIC (frozen positions, 0.0 m/s).
  */
 
+import { CONFIG } from './config.js';
+
 export class WorldModel {
   constructor() {
     this.totalLength = 320.0; // 320 meters track
@@ -122,19 +124,16 @@ export class WorldModel {
     const loopS = ((s % this.totalLength) + this.totalLength) % this.totalLength;
     const road = this.getRoadCenter(loopS);
 
-    // Scenario name & base speed
+    // Scenario name & base speed (admin-editable via CONFIG.scenarioSpeedsKmh)
     let scenario = 'Urban Drive';
-    let speedKmh = 22.1;
     if (loopS > 80 && loopS <= 160) {
       scenario = 'Pothole Detection';
-      speedKmh = 20.4;
     } else if (loopS > 160 && loopS <= 250) {
       scenario = 'Left Turn';
-      speedKmh = 16.9;
     } else if (loopS > 250) {
       scenario = 'Dynamic Turn';
-      speedKmh = 18.5;
     }
+    const speedKmh = CONFIG.scenarioSpeedsKmh[scenario] ?? 20.0;
 
     // World to Road-Relative Projection for Dynamic Vehicles
     const toRoadRelativeCoords = (wx, wy, roadX, roadY, roadHeadingRad) => {
@@ -290,12 +289,12 @@ export class WorldModel {
         local_terrain_height_m: terrHeight
       },
       metrics: {
-        fps: Math.round(30 + Math.sin(timeSec) * 2),
-        latency_ms: Math.round(32 + Math.cos(timeSec) * 3),
-        miou: Number((87.5 + Math.sin(timeSec * 0.4) * 1.5).toFixed(1)),
-        grid_cells: Math.floor(13400 + Math.sin(timeSec * 0.8) * 600),
-        compute_savings_pct: Number((62.8 + Math.cos(timeSec * 0.5) * 1.2).toFixed(1)),
-        memory_mb: 432
+        fps: Math.round(CONFIG.metricsBaseline.fps + Math.sin(timeSec) * 2),
+        latency_ms: Math.round(CONFIG.metricsBaseline.latency_ms + Math.cos(timeSec) * 3),
+        miou: Number((CONFIG.metricsBaseline.miou + Math.sin(timeSec * 0.4) * 1.5).toFixed(1)),
+        grid_cells: Math.floor(CONFIG.metricsBaseline.grid_cells + Math.sin(timeSec * 0.8) * 600),
+        compute_savings_pct: Number((CONFIG.metricsBaseline.compute_savings_pct + Math.cos(timeSec * 0.5) * 1.2).toFixed(1)),
+        memory_mb: CONFIG.metricsBaseline.memory_mb
       }
     };
   }

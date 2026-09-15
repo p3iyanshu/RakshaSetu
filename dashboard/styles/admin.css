@@ -1,0 +1,269 @@
+/* ==========================================================================
+   RakshaSetu Admin Console — layout on top of dashboard.css's theme tokens
+   ========================================================================== */
+
+/* admin.css only loads on admin.html, so overriding html/body directly is safe */
+html,
+body {
+  height: auto;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+.admin-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100vw;
+  padding: 8px 10px 24px;
+  gap: 10px;
+  background: radial-gradient(circle at 50% 30%, rgba(0, 242, 254, 0.04) 0%, transparent 60%), #03060c;
+}
+
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-card {
+  padding: 14px 16px;
+}
+
+.admin-subtitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+/* --- Monitoring --- */
+
+.admin-monitoring-body {
+  gap: 14px;
+}
+
+.admin-scene-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 8px 10px;
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 11.5px;
+  color: var(--text-primary);
+}
+
+.admin-scene-strip b {
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.admin-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.admin-metric-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.admin-metric-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.admin-metric-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.admin-sparkline {
+  width: 100%;
+  height: 26px;
+  display: block;
+}
+
+.admin-split {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 14px;
+  min-height: 0;
+}
+
+.admin-table-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.admin-table thead th {
+  position: sticky;
+  top: 0;
+  background: #0b1424;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 9.5px;
+  letter-spacing: 0.4px;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-table tbody td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.admin-table tbody tr:hover {
+  background: var(--bg-card-hover);
+}
+
+.admin-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.admin-event-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.admin-event-time {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.admin-event-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.admin-event-text {
+  color: var(--text-primary);
+}
+
+/* --- Configuration --- */
+
+.admin-config-body {
+  gap: 16px;
+}
+
+.admin-config-section {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-config-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.admin-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-field-pair {
+  display: contents;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
+.admin-field input {
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.admin-field input:focus {
+  border-color: var(--border-active);
+}
+
+.admin-btn {
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.4);
+  color: #00f2fe;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 7px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-btn:hover {
+  background: rgba(0, 242, 254, 0.16);
+}
+
+.admin-btn-applied {
+  background: rgba(0, 230, 118, 0.16) !important;
+  border-color: rgba(0, 230, 118, 0.5) !important;
+  color: #00e676 !important;
+}
+
+.admin-btn-danger {
+  margin-top: 4px;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.admin-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+@media (max-width: 900px) {
+  .admin-split {
+    grid-template-columns: 1fr;
+  }
+}

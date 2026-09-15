@@ -33,6 +33,8 @@ export function createHeader(container, onScenarioChange) {
           <span class="status-text">SYSTEM ONLINE</span>
         </div>
 
+        <a href="./admin.html" class="admin-link-pill" title="Open admin console">ADMIN</a>
+
         <div class="clock-display" id="system-clock">17:55:12</div>
       </div>
     </header>

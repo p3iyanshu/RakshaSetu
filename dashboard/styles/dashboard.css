@@ -96,6 +96,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .rs-logo-badge {
@@ -231,6 +232,27 @@ html, body {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
+}
+
+.admin-link-pill {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: #09121f;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-link-pill:hover {
+  color: var(--text-cyan);
+  border-color: var(--border-card-hover);
 }
 
 .clock-display {
@@ -383,6 +405,7 @@ html, body {
 .dot-wall { background: var(--color-red); box-shadow: 0 0 6px var(--color-red); }
 .dot-pole { background: var(--color-pole); box-shadow: 0 0 6px var(--color-pole); }
 .dot-vehicle { background: var(--color-yellow); box-shadow: 0 0 6px var(--color-yellow); }
+.dot-human { background: var(--color-orange); box-shadow: 0 0 6px var(--color-orange); }
 .dot-unclassified { background: var(--color-gray); box-shadow: 0 0 4px var(--color-gray); }
 
 /* ==========================================================================
