@@ -39,6 +39,11 @@ security/audit.log
 # GPU-specific in the .engine case, never source
 security/optimized/
 
+# SROS2 keystore (security/generate_sros2_keystore.sh) -- contains real
+# private keys (enclaves/*/key.pem, private/ca.key.pem); never commit a
+# keystore, regenerate it locally instead
+security/sros2_keystore/
+
 # colcon build output (ros2_ws/) -- generated locally by every builder, never source
 ros2_ws/build/
 ros2_ws/install/

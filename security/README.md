@@ -148,11 +148,90 @@ in this environment. The `.onnx` file is portable to one; the `.engine`
 file is **not** (TensorRT engines are tied to the exact GPU/driver/TensorRT
 version that built them) and would need rebuilding on the target device.
 
+## SROS2: encrypted, authenticated ROS 2 node-to-node traffic
+
+Was blocked all week on Member 4's ROS 2 nodes existing; they now do
+(`ros2_ws/src/rakshasetu/`), so this is done.
+
+```bash
+source /opt/ros/humble/setup.bash   # or wherever your ROS 2 Humble install is
+bash security/generate_sros2_keystore.sh
+```
+Creates `security/sros2_keystore/` (gitignored -- real private keys) with one
+enclave per pipeline node (`lidar_ingest_node`, `preprocessing_node`,
+`ego_odometry_node`, `segmentation_node`, `grid_engine_node`, `tracking_node`,
+`fusion_node`) plus `integration_test_harness` for the test below. Prints the
+exact `ROS_SECURITY_*` env vars to export before `ros2 launch`.
+
+**A real bug found and fixed while verifying this actually works, not just
+that the keystore generates:** on the ROS 2 Humble build this was tested
+against, matching a node to its enclave by the node's own fully-qualified
+name alone (the normally-documented default) silently did NOT work --
+every node resolved to the keystore's ROOT enclave instead (which has no
+`cert.pem`/`key.pem` of its own) and failed to start with `rcl`'s generic
+`"couldn't find all security files!"` error. Root-caused by running with
+`ROS_SECURITY_ENCLAVE_OVERRIDE` explicitly set per node and observing the
+`rcl` log line change from `Found security directory: .../enclaves` (wrong
+-- the keystore root) to `.../enclaves/<node_name>` (right). Fixed at the
+source: `ros2_ws/src/rakshasetu/launch/rakshasetu.launch.py` now sets
+`additional_env={"ROS_SECURITY_ENCLAVE_OVERRIDE": f"/{name}"}` on every
+`Node` action -- inert when security is off, required when it's on. If you
+run a node directly with `ros2 run` instead of through that launch file,
+set the same env var yourself (the generation script's own printed output
+reminds you).
+
+**Note on the keystore's location:** it lives under `security/` in this
+repo for convenience, but if your ROS 2 install's security plugin reports
+the same opaque "couldn't find all security files" error even after
+setting `ROS_SECURITY_ENCLAVE_OVERRIDE` correctly, regenerate the keystore
+onto your OS's native filesystem instead of a Windows-drive/network mount
+(e.g. WSL's `/mnt/*` DrvFs) and point `ROS_SECURITY_KEYSTORE` there --
+some filesystem/security-plugin combinations behave inconsistently with
+keystores on a non-native mount, and this was one of the first things ruled
+out while diagnosing the bug above.
+
+## Full ROS 2 pipeline integration test
+
+```bash
+source /opt/ros/humble/setup.bash
+source ros2_ws/install/setup.bash    # colcon build first if this doesn't exist yet
+python3 security/integration_test_ros2_pipeline.py                 # SROS2 enforced (default)
+python3 security/integration_test_ros2_pipeline.py --no-security --timeout-s 20
+```
+
+Launches the 7 REAL pipeline nodes (no mocks -- the actual
+segmentation/grid/tracking/fusion wrappers around Members 1-3's code) as
+subprocesses and confirms real, well-formed, NaN/Inf-free frames come out
+`/rakshasetu/fusion/output`. `lidar_ingest_node`/`ego_odometry_node`
+self-publish from `shared/mock_data.py`'s real 20-frame scene on their own
+timers (see those nodes' own "SWAP FOR REAL DATA LATER" docstrings) --
+nothing else needs to be injected.
+
+**Status, stated honestly (2026-09-15/16):** the SROS2 keystore +
+`ROS_SECURITY_ENCLAVE_OVERRIDE` fix documented above **is verified** --
+confirmed working end to end with real pipeline nodes and real data,
+security enforced. The script above, in its current form, has **not yet
+been cleanly re-verified** against `feature/ros2-integration` specifically:
+an earlier version of this test was verified against a since-discovered
+*stale, uncommitted* copy of `ros2_ws/src` that turned out to differ from
+the canonical branch (different wire-schema module -- `topics.py` vs.
+`schemas.py` -- though the same topic names, node names, and JSON-over-
+`std_msgs/String` approach). This script has been rewritten to match
+`schemas.py`'s actual contract, but a clean confirmation run was
+interrupted mid-session by discovering ANOTHER concurrent session's live
+CARLA simulation + `carla_ros_bridge` actively running on the same
+`ROS_DOMAIN_ID` on this shared machine -- re-running node launches
+alongside it risked cross-talk contaminating both runs' results, so
+testing was paused to avoid disrupting what may be today's hackathon
+rehearsal. **Next step, not yet done:** either re-run this script with
+`ROS_DOMAIN_ID` set to something other than the live demo's, or coordinate
+a window when the domain is free, then update this section with a real
+confirmed pass/fail against `feature/ros2-integration`.
+
 ## What's intentionally not here (yet)
 
-- SROS2 keystores for ROS 2 node-to-node traffic -- blocked on Member 4's
-  ROS 2 nodes existing (`ros2 security create_keystore` needs a running
-  workspace to point at).
 - FP16/INT8 TensorRT precision, a Jetson deployment test, the fallback
   demo video -- separate items on Member 6's checklist, not part of this
   pass.
+- A live-CARLA run of the integration test above (see that section's
+  "scope, stated honestly").
