@@ -13,6 +13,7 @@ Public API:
     height_above_ground(points_xyz, plane)     -> (N,) float array
     build_adaptive_grid(points, labels, confidence, ground_plane=None) -> dict
     build_uniform_grid(points, labels, confidence, ground_plane=None)  -> dict
+    position_to_bin(x, y, edges=RANGE_BIN_EDGES)                       -> (range_bin, angular_bin)
 
 Import RANGE_BIN_EDGES from here (mirrored into shared/schemas.py's
 RING_BOUNDARIES) -- never hand-duplicate the band table elsewhere.
@@ -223,3 +224,29 @@ def build_uniform_grid(points, labels, confidence, ground_plane=None):
 
 # Backwards-compatible alias for the day-1 unblocking skeleton's name.
 build_grid = build_adaptive_grid
+
+
+def position_to_bin(x, y, edges=RANGE_BIN_EDGES):
+    """Single-point convenience wrapper around the exact same (range_bin,
+    angular_bin) binning `_build_grid` uses internally for every point in a
+    frame -- for callers (Member 4's Fusion node) that need to map ONE
+    position (a tracked object's centroid) onto the same grid this module
+    built, using the identical convention, without re-deriving the
+    non-trivial per-band angular bin count / wrap-seam math independently.
+    ros2_ws/interfaces.md SS7 depends on GridEngine and Fusion agreeing on
+    this exactly -- see that file's "Corrected in v2" note on why two
+    independent implementations of this conversion is exactly the bug that
+    was found and fixed once already.
+
+    Always returns a bin, even for a point beyond `edges`' outer radius
+    (clipped to the outermost band) -- matching `_build_grid`'s own
+    range/angular math before its `valid` filter is applied. The caller
+    decides what to do when that bin doesn't correspond to any actually
+    occupied cell (see fusion_node.py).
+    """
+    r = np.array([np.hypot(x, y)])
+    theta = np.array([np.arctan2(y, x)])
+    range_bin, _valid = _range_bin_lookup(r, edges)
+    n_angular_bins = _angular_bin_counts(edges)
+    angular_bin = _angular_bin_lookup(theta, range_bin, n_angular_bins)
+    return int(range_bin[0]), int(angular_bin[0])
