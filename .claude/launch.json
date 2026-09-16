@@ -2,16 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "rakshasetu-dashboard-frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "dashboard/frontend"],
-      "port": 5173
-    },
-    {
-      "name": "rakshasetu-dashboard-backend",
+      "name": "rakshasetu-dashboard",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "uvicorn", "main:app", "--reload", "--port", "8000", "--app-dir", "dashboard/backend"],
-      "port": 8000
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "dashboard"],
+      "port": 8080
     }
   ]
 }

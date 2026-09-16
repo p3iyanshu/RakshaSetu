@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RakshaSetu — Vehicle Perception Dashboard (SIH PS 26053)</title>
+  
+  <!-- Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Dashboard Stylesheet -->
+  <link rel="stylesheet" href="./styles/dashboard.css?v=2.8">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 1. Header Bar -->
+    <div id="header-mount"></div>
+
+    <!-- 2. Main 3-Column Layout -->
+    <main class="main-workspace">
+      <!-- Left Sidebar: Scene Info, Adaptive Grid, Semantic Legend -->
+      <aside class="left-sidebar">
+        <div id="scene-info-mount"></div>
+        <div id="adaptive-grid-mount"></div>
+        <div id="semantic-legend-mount"></div>
+      </aside>
+
+      <!-- Center: Main 2.5D Top-Down Perception Map -->
+      <section class="center-map-container" id="map-mount"></section>
+
+      <!-- Right Sidebar: Perception Events, Selected Object, Elevation -->
+      <aside class="right-sidebar">
+        <div id="events-mount"></div>
+        <div id="selected-object-mount"></div>
+        <div id="elevation-mount"></div>
+      </aside>
+    </main>
+
+    <!-- 3. Bottom Bar: 6 Stat Tiles + Playback Controls -->
+    <div id="metrics-mount"></div>
+  </div>
+
+  <!-- Modular JavaScript Engine -->
+  <script type="module" src="./src/app.js?v=2.8"></script>
+</body>
+</html>

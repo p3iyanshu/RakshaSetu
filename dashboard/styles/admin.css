@@ -1,0 +1,384 @@
+/* ==========================================================================
+   RakshaSetu Admin Console — layout on top of dashboard.css's theme tokens
+   ========================================================================== */
+
+.admin-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  padding: 8px 10px;
+  gap: 8px;
+  background: radial-gradient(circle at 50% 30%, rgba(0, 242, 254, 0.04) 0%, transparent 60%), #03060c;
+}
+
+.admin-body-layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.admin-content {
+  min-height: 0;
+}
+
+.admin-subtitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.admin-empty-state {
+  padding: 14px 10px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* --- Sidebar: Fleet search + list --- */
+
+.admin-fleet-card {
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-fleet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+
+.admin-search-input {
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 11.5px;
+  padding: 7px 9px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.admin-search-input:focus {
+  border-color: var(--border-active);
+}
+
+.admin-vehicle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.admin-vehicle-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 9px;
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-main);
+}
+
+.admin-vehicle-row:hover {
+  border-color: var(--border-card-hover);
+}
+
+.admin-vehicle-row.selected {
+  border-color: var(--border-active);
+  background: rgba(0, 242, 254, 0.08);
+}
+
+.admin-vehicle-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.admin-vehicle-make {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.admin-vehicle-badge {
+  margin-top: 3px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.admin-vehicle-badge.live {
+  color: #00e676;
+  background: rgba(0, 230, 118, 0.12);
+}
+
+.admin-vehicle-badge.offline {
+  color: var(--text-muted);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+/* --- Sidebar: View nav --- */
+
+.admin-nav-card {
+  flex-shrink: 0;
+}
+
+.admin-nav-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-nav-btn {
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.admin-nav-btn:hover {
+  border-color: var(--border-card-hover);
+  color: var(--text-primary);
+}
+
+.admin-nav-btn.active {
+  background: rgba(0, 242, 254, 0.1);
+  border-color: var(--border-active);
+  color: var(--text-cyan);
+}
+
+/* --- Detection Panel --- */
+
+.admin-detection-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.admin-detection-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.admin-basic-info-card {
+  flex-shrink: 0;
+}
+
+.admin-log-card {
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-log-card .card-body {
+  overflow-y: auto;
+  gap: 6px;
+}
+
+.admin-map-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  gap: 8px;
+}
+
+.lidar-feed-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.lidar-feed-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #fff;
+}
+
+.lidar-feed-stats {
+  font-size: 11.5px;
+  color: var(--text-cyan);
+}
+
+.lidar-feed-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: radial-gradient(circle at 50% 100%, rgba(0, 242, 254, 0.06) 0%, transparent 65%), var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lidar-feed-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lidar-feed-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.lidar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
+.lidar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.admin-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-event-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.admin-event-time {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.admin-event-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.admin-event-text {
+  color: var(--text-primary);
+}
+
+/* --- Accident Records --- */
+
+.admin-accidents-card {
+  height: 100%;
+}
+
+.admin-accidents-body {
+  overflow-y: auto;
+  gap: 8px;
+}
+
+.admin-accident-row {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.admin-accident-date {
+  flex-shrink: 0;
+  width: 82px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.admin-accident-cause {
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+}
+
+.admin-accident-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.admin-severity-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.admin-severity-badge.severity-minor {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.12);
+}
+
+.admin-severity-badge.severity-moderate {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.12);
+}
+
+.admin-severity-badge.severity-severe {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+@media (max-width: 900px) {
+  .admin-body-layout {
+    grid-template-columns: 1fr;
+  }
+  .admin-detection-grid {
+    grid-template-columns: 1fr;
+  }
+}
