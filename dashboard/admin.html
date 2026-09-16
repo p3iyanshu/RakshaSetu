@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RakshaSetu — Admin Console (SIH PS 26053)</title>
+
+  <!-- Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Shared dashboard theme + admin-specific layout -->
+  <link rel="stylesheet" href="./styles/dashboard.css?v=1">
+  <link rel="stylesheet" href="./styles/admin.css?v=2">
+</head>
+<body>
+  <div class="admin-container">
+    <div id="admin-header-mount"></div>
+
+    <div class="admin-body-layout">
+      <aside id="admin-sidebar-mount" class="admin-sidebar"></aside>
+      <main id="admin-content-mount" class="admin-content"></main>
+    </div>
+  </div>
+
+  <script type="module" src="./src/admin.js?v=2"></script>
+</body>
+</html>

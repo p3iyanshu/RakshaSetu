@@ -1,0 +1,1632 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>RakshaSetu Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Titillium+Web:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ground:#0a1110;
+    --surface:#111c1d;
+    --surface-raised:#17272a;
+    --line:#24393b;
+    --line-bright:#3a5a5c;
+    --ink:#dce9e7;
+    --ink-dim:#7d9a97;
+    --ink-faint:#4d6461;
+    --signal:#3ccbe8;
+    --signal-soft:rgba(60,203,232,0.16);
+    --signal-glow:rgba(60,203,232,0.45);
+    --amber:#e2a23b;
+    --amber-soft:rgba(226,162,59,0.16);
+    --amber-glow:rgba(226,162,59,0.5);
+    --safe:#4ac26b;
+    --safe-soft:rgba(74,194,107,0.14);
+    --danger:#e2584f;
+    --danger-soft:rgba(226,88,79,0.16);
+    --nondrivable:#8c7a63;
+    --nondrivable-soft:rgba(140,122,99,0.16);
+    --hazard:#b26bf0;
+    --hazard-soft:rgba(178,107,240,0.16);
+    --hazard-glow:rgba(178,107,240,0.55);
+    --font-display:'Chakra Petch','Segoe UI',sans-serif;
+    --font-body:'Titillium Web','Segoe UI',sans-serif;
+    --font-mono:'IBM Plex Mono','Consolas',monospace;
+    --cut:14px;
+  }
+
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .app{
+    position:relative;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse 900px 600px at 50% -10%, rgba(60,203,232,0.07), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 100%, rgba(226,162,59,0.05), transparent 55%),
+      var(--ground);
+    overflow-x:hidden;
+  }
+
+  .app::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:50;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(220,233,231,0.025) 0px, rgba(220,233,231,0.025) 1px, transparent 1px, transparent 3px);
+    mix-blend-mode:overlay;
+    opacity:0.5;
+  }
+
+  .grid-field{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background-image:
+      linear-gradient(rgba(60,203,232,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(60,203,232,0.05) 1px, transparent 1px);
+    background-size:42px 42px;
+    -webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 30%, black 0%, transparent 75%);
+            mask-image:radial-gradient(ellipse 80% 70% at 50% 30%, black 0%, transparent 75%);
+    z-index:0;
+  }
+
+  .cut{
+    clip-path:polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+
+  /* ---------- topbar ---------- */
+  .topbar{
+    position:relative;
+    z-index:5;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    padding:16px 28px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(17,28,29,0.9), rgba(17,28,29,0.55));
+    backdrop-filter:blur(6px);
+    flex-wrap:wrap;
+  }
+
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:36px; height:36px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:15px;
+    color:var(--ground);
+    background:var(--signal);
+  }
+  .brand-mark{ clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px); }
+  .brand-text{ display:flex; flex-direction:column; line-height:1.15; }
+  .brand-name{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:19px;
+    letter-spacing:0.06em;
+    color:var(--ink);
+  }
+  .brand-tag{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:0.05em;
+    color:var(--ink-dim);
+    text-transform:uppercase;
+  }
+
+  .mode-switch{ display:flex; gap:8px; }
+  .mode-btn{
+    font-family:var(--font-display);
+    font-size:12px;
+    letter-spacing:0.08em;
+    font-weight:600;
+    color:var(--ink-dim);
+    background:var(--surface);
+    border:1px solid var(--line);
+    padding:9px 18px;
+    cursor:pointer;
+    transition:color .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+  }
+  .mode-btn:hover{ color:var(--ink); border-color:var(--line-bright); }
+  .mode-btn.active{
+    color:var(--ground);
+    background:var(--signal);
+    border-color:var(--signal);
+  }
+  .mode-btn:focus-visible{ outline:2px solid var(--signal); outline-offset:2px; }
+
+  .status-cluster{ display:flex; align-items:center; gap:16px; font-family:var(--font-mono); }
+  .status-pill{
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; letter-spacing:0.06em;
+    color:var(--safe);
+    background:var(--safe-soft);
+    border:1px solid rgba(74,194,107,0.35);
+    padding:6px 12px;
+  }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--safe); }
+  .dot.pulse{ animation:pulse-dot 1.8s ease-in-out infinite; }
+  @keyframes pulse-dot{ 0%,100%{ opacity:1; box-shadow:0 0 0 0 rgba(74,194,107,0.5);} 50%{ opacity:.55; box-shadow:0 0 0 5px rgba(74,194,107,0);} }
+  .clock{ font-size:13px; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:0.04em; }
+
+  /* ---------- views ---------- */
+  main{ position:relative; z-index:2; }
+  .view{ display:none; }
+  .view.active{ display:block; animation:view-in .5s ease both; }
+  @keyframes view-in{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:translateY(0);} }
+
+  /* ================= VEHICLE HUD — instrument cluster ================= */
+  #view-vehicle.active{ height:calc(100vh - 74px); overflow:hidden; }
+  .cluster{
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:0;
+    padding:18px 28px 14px;
+    gap:10px;
+  }
+
+  .cluster-top{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+
+  .speed-block{ display:flex; align-items:baseline; gap:8px; }
+  .speed-num{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:clamp(52px, 8vw, 88px);
+    line-height:1;
+    color:var(--ink);
+    font-variant-numeric:tabular-nums;
+    letter-spacing:0.01em;
+  }
+  .speed-unit{
+    font-family:var(--font-mono);
+    font-size:14px;
+    color:var(--ink-dim);
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    padding-bottom:10px;
+  }
+
+  .gear-row{ display:flex; gap:6px; }
+  .gear-pill{
+    width:30px; height:30px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-weight:600; font-size:13px;
+    color:var(--ink-faint);
+    border:1px solid var(--line);
+    border-radius:50%;
+  }
+  .gear-pill.active{
+    color:var(--ground);
+    background:var(--signal);
+    border-color:var(--signal);
+  }
+
+  .adas-pill{
+    display:flex; align-items:center; gap:8px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.06em;
+    color:var(--safe);
+    background:var(--safe-soft);
+    border:1px solid rgba(74,194,107,0.35);
+    padding:7px 14px;
+  }
+
+  .stage-wrap{
+    position:relative;
+    flex:1 1 auto;
+    min-height:160px;
+    border:1px solid var(--line);
+    background:#0a1213;
+    overflow:hidden;
+  }
+  .cluster-canvas{ width:100%; height:100%; display:block; }
+
+  .alert-toast{
+    position:absolute; left:50%; top:18px;
+    transform:translate(-50%,-14px);
+    font-family:var(--font-mono); font-size:12.5px; letter-spacing:0.06em;
+    color:var(--amber);
+    background:rgba(10,18,19,0.92);
+    border:1px solid rgba(226,162,59,0.5);
+    padding:9px 18px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    white-space:nowrap;
+  }
+  .alert-toast.show{
+    opacity:1;
+    transform:translate(-50%,0);
+    animation:alert-flash 1s ease-in-out infinite;
+  }
+
+  .cluster-bottom{ display:flex; flex-direction:column; gap:8px; }
+  .diag-strip{
+    display:flex; flex-wrap:wrap; gap:20px;
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.05em;
+    color:var(--ink-dim);
+    text-transform:uppercase;
+  }
+  .diag-strip strong{
+    color:var(--signal); font-weight:500; margin-left:5px;
+    font-variant-numeric:tabular-nums;
+  }
+  @keyframes alert-flash{ 0%,100%{ box-shadow:0 0 0 rgba(226,162,59,0);} 50%{ box-shadow:0 0 22px var(--amber-glow);} }
+
+  .legend-strip{
+    grid-column:1 / -1;
+    display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.05em; color:var(--ink-dim);
+    padding-top:4px;
+  }
+  .legend-strip > span{ display:flex; align-items:center; gap:7px; }
+  .legend-strip.compact{ grid-column:auto; justify-content:flex-start; gap:12px; padding-top:0; margin-top:10px; font-size:9.5px; }
+  .dot-legend{ width:8px; height:8px; display:inline-block; }
+  .dot-legend.drivable{ background:var(--safe); border-radius:50%; }
+  .dot-legend.static{ background:var(--danger); }
+  .dot-legend.dynamic{ background:var(--amber); border-radius:50%; }
+  .dot-legend.nondrivable{ background:var(--nondrivable); }
+  .dot-legend.hazard{ background:var(--hazard); border-radius:50%; box-shadow:0 0 6px var(--hazard-glow); }
+  .mode-chip{
+    font-family:var(--font-display); font-weight:600; font-size:10px; letter-spacing:0.08em;
+    padding:5px 11px; border:1px solid var(--line-bright); color:var(--ink-dim);
+    opacity:0.4; transition:opacity .25s ease, box-shadow .25s ease;
+  }
+  .mode-chip.ugv{ color:var(--amber); border-color:rgba(226,162,59,0.4); }
+  .mode-chip.civ{ color:var(--signal); border-color:rgba(60,203,232,0.4); }
+  .mode-chip.mode-active{ opacity:1; }
+  .mode-chip.ugv.mode-active{ background:var(--amber-soft); }
+  .mode-chip.civ.mode-active{ background:var(--signal-soft); }
+
+  /* ================= TOP-DOWN LIDAR — bird's-eye radial sweep ================= */
+  #view-topdown.active{ height:calc(100vh - 74px); overflow:hidden; }
+  .radar-cluster{
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:0;
+    padding:18px 28px 14px;
+    gap:10px;
+  }
+  .radar-top{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+  .radar-title{
+    font-family:var(--font-display); font-weight:700; font-size:15px;
+    letter-spacing:0.08em; color:var(--ink); text-transform:uppercase;
+  }
+  .radar-sub{
+    font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim);
+    letter-spacing:0.05em; margin-top:2px;
+  }
+  .radar-stage-wrap{
+    position:relative;
+    flex:1 1 auto;
+    min-height:160px;
+    height:100%;
+    aspect-ratio:1/1;
+    max-width:100%;
+    margin:0 auto;
+    border:1px solid var(--line);
+    background:#a9a9a9;
+    overflow:hidden;
+  }
+  .radar-canvas{ width:100%; height:100%; display:block; }
+  .dot-legend.road{ background:#c72ead; border-radius:50%; }
+  .dot-legend.vegetation{ background:#2f6e3a; }
+
+  /* ================= WEB COMMAND DECK ================= */
+  .deck{ display:flex; min-height:calc(100vh - 74px); }
+
+  .sidebar{
+    width:60px;
+    border-right:1px solid var(--line);
+    background:rgba(17,28,29,0.5);
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px 0; gap:6px;
+    flex-shrink:0;
+  }
+  .nav-item{
+    width:38px; height:38px;
+    display:flex; align-items:center; justify-content:center;
+    background:transparent; border:1px solid transparent;
+    color:var(--ink-dim); font-size:16px; cursor:pointer;
+    transition:all .15s ease;
+  }
+  .nav-item:hover{ color:var(--ink); border-color:var(--line); }
+  .nav-item.active{ color:var(--signal); border-color:rgba(60,203,232,0.4); background:var(--signal-soft); }
+  .nav-item:focus-visible{ outline:2px solid var(--signal); outline-offset:2px; }
+  .nav-item.nav-pulse{ color:var(--amber); border-color:rgba(226,162,59,0.5); background:var(--amber-soft); }
+
+  .panels{
+    flex:1;
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));
+    gap:16px;
+    padding:20px;
+    align-content:start;
+  }
+
+  .panel{
+    background:linear-gradient(180deg, var(--surface), rgba(17,28,29,0.65));
+    border:1px solid var(--line);
+    padding:16px 18px 18px;
+    min-width:0;
+    transition:border-color .3s ease, box-shadow .3s ease;
+  }
+  .panel.panel-highlight{
+    border-color:var(--signal);
+    box-shadow:0 0 0 1px var(--signal);
+  }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    font-family:var(--font-display); font-weight:600; font-size:12.5px; letter-spacing:0.09em;
+    color:var(--ink); text-transform:uppercase;
+    margin-bottom:12px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--line);
+  }
+  .panel-meta{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.03em;
+    color:var(--signal); text-transform:none; font-weight:400;
+    font-variant-numeric:tabular-nums;
+  }
+  .badge-save{
+    font-family:var(--font-mono); font-size:11px; font-weight:500;
+    color:var(--safe); background:var(--safe-soft);
+    border:1px solid rgba(74,194,107,0.35);
+    padding:3px 9px;
+  }
+
+  .point-canvas{ width:100%; aspect-ratio:16/10; display:block; background:#0c1516; }
+
+  .grid-live-toggle{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .toggle-label{ font-family:var(--font-mono); font-size:10px; color:var(--ink-dim); letter-spacing:0.04em; text-transform:uppercase; }
+  .toggle-group{ display:flex; border:1px solid var(--line-bright); }
+  .toggle-btn{
+    font-family:var(--font-display); font-weight:600; font-size:10.5px; letter-spacing:0.06em;
+    color:var(--ink-dim); background:transparent; border:none; padding:6px 12px; cursor:pointer;
+  }
+  .toggle-btn.active{ color:var(--ground); background:var(--signal); }
+  .toggle-btn:not(.active):hover{ color:var(--ink); }
+  .grid-compare{ display:flex; gap:16px; }
+  .grid-block{ flex:1; text-align:center; }
+  .grid-visual{
+    aspect-ratio:1/1; position:relative; overflow:hidden;
+    background:#0c1516; border:1px solid var(--line); margin-bottom:10px;
+  }
+  .uniform-visual{
+    background-image:linear-gradient(rgba(226,88,79,0.35) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(226,88,79,0.35) 1px, transparent 1px);
+    background-size:8px 8px;
+  }
+  .adaptive-visual{
+    background-image:
+      radial-gradient(circle at 50% 50%, transparent 0 22%, rgba(60,203,232,0) 22%),
+      linear-gradient(rgba(74,194,107,0.55) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74,194,107,0.55) 1px, transparent 1px);
+    background-size:100% 100%, 6px 6px, 6px 6px;
+    -webkit-mask-image:radial-gradient(circle at 50% 50%, black 0 24%, transparent 24%);
+            mask-image:radial-gradient(circle at 50% 50%, black 0 24%, transparent 24%);
+  }
+  .adaptive-visual::after{
+    content:"";
+    position:absolute; inset:0;
+    background-image:linear-gradient(rgba(60,203,232,0.3) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(60,203,232,0.3) 1px, transparent 1px);
+    background-size:22px 22px;
+  }
+  .grid-caption{ font-family:var(--font-mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; line-height:1.6; }
+  .grid-caption strong{ font-family:var(--font-display); font-size:15px; color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  .log-list{ display:flex; flex-direction:column; gap:6px; max-height:230px; overflow-y:auto; }
+  .log-row{
+    display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; align-items:center;
+    font-family:var(--font-mono); font-size:11px; color:var(--ink-dim);
+    padding:7px 10px; background:rgba(255,255,255,0.02); border:1px solid var(--line);
+    animation:row-in .3s ease both;
+  }
+  @keyframes row-in{ from{ opacity:0; transform:translateX(-6px);} to{ opacity:1; transform:translateX(0);} }
+  .log-time{ color:var(--ink-faint); }
+  .log-class{ font-weight:600; letter-spacing:0.04em; text-transform:uppercase; font-size:10px; }
+  .log-class.drivable{ color:var(--safe); }
+  .log-class.static{ color:var(--danger); }
+  .log-class.dynamic{ color:var(--amber); }
+  .log-class.nondrivable{ color:var(--nondrivable); }
+  .log-class.hazard{ color:var(--hazard); }
+  .log-dist{ color:var(--ink); font-variant-numeric:tabular-nums; }
+  .log-conf{ color:var(--signal); font-variant-numeric:tabular-nums; }
+
+  .health-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px 18px; }
+  .gauge-wrap{ text-align:center; }
+  .gauge{ width:100%; max-width:130px; }
+  .gauge-track{ fill:none; stroke:var(--line); stroke-width:8; }
+  .gauge-fill{ fill:none; stroke:var(--signal); stroke-width:8; stroke-linecap:round; transition:stroke-dashoffset .5s ease; }
+  .gauge-label{ font-family:var(--font-mono); font-size:10px; color:var(--ink-dim); letter-spacing:0.08em; text-transform:uppercase; margin-top:-30px; }
+  .gauge-label span{ display:block; font-family:var(--font-display); font-size:20px; color:var(--ink); margin-top:2px; font-variant-numeric:tabular-nums; }
+
+  .bar-row{ grid-column:1/-1; display:grid; grid-template-columns:44px 1fr 40px; align-items:center; gap:10px; font-family:var(--font-mono); font-size:11px; color:var(--ink-dim); }
+  .bar{ height:6px; background:var(--line); position:relative; overflow:hidden; }
+  .bar-fill{ position:absolute; inset:0 auto 0 0; background:linear-gradient(90deg, var(--signal), #1f8fa8); transition:width .6s ease; }
+  .bar-row span:last-child{ text-align:right; color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  .statusbar{
+    display:flex; flex-wrap:wrap; gap:22px;
+    padding:11px 24px;
+    border-top:1px solid var(--line);
+    background:rgba(17,28,29,0.6);
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.04em;
+    color:var(--ink-dim);
+  }
+  .statusbar span span{ color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  @media (max-width:880px){
+    .cluster{ padding:16px; }
+    .cluster-top{ flex-direction:column; align-items:flex-start; }
+    .stage-wrap{ min-height:260px; }
+    .radar-cluster{ padding:16px; }
+    .radar-stage-wrap{ min-height:260px; }
+    .panels{ grid-template-columns:1fr; }
+    .deck{ flex-direction:column; }
+    .sidebar{ width:100%; flex-direction:row; border-right:none; border-bottom:1px solid var(--line); }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .dot.pulse, .alert-toast.show, .view.active{ animation:none !important; }
+  }
+</style>
+
+<div class="app">
+  <div class="grid-field"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">RS</div>
+      <div class="brand-text">
+        <span class="brand-name">RAKSHASETU</span>
+      </div>
+    </div>
+    <nav class="mode-switch">
+      <button class="mode-btn active" data-view="vehicle">VEHICLE HUD</button>
+      <button class="mode-btn" data-view="topdown">TOP-DOWN LIDAR</button>
+      <button class="mode-btn" data-view="web">WEB COMMAND DECK</button>
+    </nav>
+    <div class="status-cluster">
+      <span class="status-pill"><span class="dot pulse"></span>SYSTEM ONLINE</span>
+      <span class="clock" id="clock">00:00:00</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============ VEHICLE HUD ============ -->
+    <section id="view-vehicle" class="view active">
+      <div class="cluster">
+
+        <div class="cluster-top">
+          <div class="speed-block">
+            <span class="speed-num" id="speedVal">18</span>
+            <span class="speed-unit">km/h</span>
+          </div>
+          <div class="gear-row" aria-hidden="true">
+            <span class="gear-pill">P</span>
+            <span class="gear-pill">R</span>
+            <span class="gear-pill">N</span>
+            <span class="gear-pill active">D</span>
+          </div>
+          <div class="adas-pill"><span class="dot pulse"></span>ADAPTIVE PERCEPTION ACTIVE</div>
+        </div>
+
+        <div class="stage-wrap">
+          <canvas id="clusterCanvas" class="cluster-canvas"></canvas>
+          <div class="alert-toast" id="alertToast"></div>
+        </div>
+
+        <div class="cluster-bottom">
+          <div class="diag-strip">
+            <span>FPS <strong id="fpsVal">42</strong></span>
+            <span>Latency <strong id="latVal">24ms</strong></span>
+            <span>Grid Cells <strong id="cellsVal">440,212</strong></span>
+            <span>Mode <strong>Adaptive&nbsp;2.5D</strong></span>
+          </div>
+          <div class="legend-strip compact">
+            <span><i class="dot-legend drivable"></i>Drivable Terrain</span>
+            <span><i class="dot-legend nondrivable"></i>Non-Drivable Terrain</span>
+            <span><i class="dot-legend static"></i>Static Obstacle</span>
+            <span><i class="dot-legend dynamic"></i>Dynamic Object</span>
+            <span title="Curbs &amp; potholes — height data a flat 2D map would miss"><i class="dot-legend hazard"></i>Elevation Hazard</span>
+            <span class="mode-chip ugv">DRDO UGV MODE</span>
+            <span class="mode-chip civ">CIVILIAN ADAS MODE</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TOP-DOWN LIDAR ============ -->
+    <section id="view-topdown" class="view">
+      <div class="radar-cluster">
+
+        <div class="radar-top">
+          <div>
+            <div class="radar-title">360&deg; Adaptive LiDAR Sweep</div>
+            <div class="radar-sub">Bird's-eye occupancy-semantic map &middot; radial-ring 2.5D grid, car-centered</div>
+          </div>
+          <div class="adas-pill"><span class="dot pulse"></span>SCANNING</div>
+        </div>
+
+        <div class="radar-stage-wrap">
+          <canvas id="radarCanvas" class="radar-canvas"></canvas>
+          <div class="alert-toast" id="alertToastTD"></div>
+        </div>
+
+        <div class="cluster-bottom">
+          <div class="diag-strip">
+            <span>FPS <strong id="fpsValTD">42</strong></span>
+            <span>Latency <strong id="latValTD">24ms</strong></span>
+            <span>Grid Cells <strong id="cellsValTD">440,212</strong></span>
+            <span>Rings <strong>4 bands &middot; 5cm&rarr;50cm</strong></span>
+          </div>
+          <div class="legend-strip compact">
+            <span><i class="dot-legend road"></i>Drivable / Road</span>
+            <span><i class="dot-legend vegetation"></i>Non-Drivable / Vegetation</span>
+            <span><i class="dot-legend static"></i>Static Obstacle (Wall/Pole/Tree)</span>
+            <span><i class="dot-legend dynamic"></i>Dynamic Object (Vehicle/Human)</span>
+            <span title="Curbs &amp; potholes — height data a flat 2D map would miss"><i class="dot-legend hazard"></i>Elevation Hazard (Curb/Pothole)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ WEB COMMAND DECK ============ -->
+    <section id="view-web" class="view">
+      <div class="deck">
+        <aside class="sidebar">
+          <button class="nav-item active" data-target="panelFeed" title="Jump to Live LiDAR Feed" aria-label="Jump to Live LiDAR Feed">&#128225;</button>
+          <button class="nav-item" data-target="panelGrid" title="Jump to Grid Comparison" aria-label="Jump to Grid Comparison">&#128506;</button>
+          <button class="nav-item" data-target="panelLog" title="Jump to Detection Log" aria-label="Jump to Detection Log">&#128203;</button>
+          <button class="nav-item" data-action="mode" title="Toggle DRDO / Civilian operating mode" aria-label="Toggle operating mode">&#9881;</button>
+        </aside>
+
+        <div class="panels">
+          <div class="panel" id="panelFeed">
+            <div class="panel-head"><span>Live LiDAR Feed</span><span class="panel-meta" id="feedMeta">FPS 42 &middot; 24ms</span></div>
+            <canvas id="pointCloudCanvas" class="point-canvas"></canvas>
+            <div class="legend-strip compact">
+              <span><i class="dot-legend drivable"></i>Drivable</span>
+              <span><i class="dot-legend nondrivable"></i>Non-Drivable</span>
+              <span><i class="dot-legend static"></i>Static (Wall/Pole/Tree)</span>
+              <span><i class="dot-legend dynamic"></i>Dynamic (Vehicle/Human)</span>
+              <span><i class="dot-legend hazard"></i>Hazard (Curb/Pothole)</span>
+            </div>
+          </div>
+
+          <div class="panel" id="panelGrid">
+            <div class="panel-head"><span>Grid Comparison</span><span class="badge-save" id="saveBadge">&minus;63% COMPUTE</span></div>
+            <div class="grid-live-toggle">
+              <span class="toggle-label">Drive live feed at</span>
+              <div class="toggle-group">
+                <button class="toggle-btn active" data-grid="adaptive">ADAPTIVE</button>
+                <button class="toggle-btn" data-grid="uniform">UNIFORM</button>
+              </div>
+            </div>
+            <div class="grid-compare">
+              <div class="grid-block">
+                <div class="grid-visual uniform-visual"></div>
+                <div class="grid-caption">UNIFORM<br><strong>1,200,000</strong> cells</div>
+              </div>
+              <div class="grid-block">
+                <div class="grid-visual adaptive-visual"></div>
+                <div class="grid-caption">ADAPTIVE<br><strong id="cellsValWeb">440,212</strong> cells<br><span style="opacity:.7">5cm@10m &rarr; 50cm@100m</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" id="panelLog">
+            <div class="panel-head"><span>Detection Log</span><span class="panel-meta">LIVE</span></div>
+            <div class="log-list" id="logList"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><span>System Health</span></div>
+            <div class="health-grid">
+              <div class="gauge-wrap">
+                <svg class="gauge" viewBox="0 0 100 58">
+                  <path class="gauge-track" d="M10,52 A40,40 0 0,1 90,52" pathLength="100"/>
+                  <path class="gauge-fill" id="fpsGaugeFill" d="M10,52 A40,40 0 0,1 90,52" pathLength="100" stroke-dasharray="100" stroke-dashoffset="30"/>
+                </svg>
+                <div class="gauge-label">FPS<span id="fpsGaugeVal">42</span></div>
+              </div>
+              <div class="gauge-wrap">
+                <svg class="gauge" viewBox="0 0 100 58">
+                  <path class="gauge-track" d="M10,52 A40,40 0 0,1 90,52" pathLength="100"/>
+                  <path class="gauge-fill" id="latGaugeFill" d="M10,52 A40,40 0 0,1 90,52" pathLength="100" stroke-dasharray="100" stroke-dashoffset="76"/>
+                </svg>
+                <div class="gauge-label">Latency ms<span id="latGaugeVal">24</span></div>
+              </div>
+              <div class="bar-row"><span>CPU</span><div class="bar"><div class="bar-fill" id="cpuBar" style="width:54%"></div></div><span id="cpuVal">54%</span></div>
+              <div class="bar-row"><span>GPU</span><div class="bar"><div class="bar-fill" id="gpuBar" style="width:71%"></div></div><span id="gpuVal">71%</span></div>
+              <div class="bar-row"><span>PWR</span><div class="bar"><div class="bar-fill" id="pwrBar" style="width:38%"></div></div><span id="pwrVal">38%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="statusbar">
+        <span>GPS <span id="gpsVal">28.6139&deg; N, 77.2090&deg; E</span></span>
+        <span>MODE <span id="opMode">UGV RECON &middot; DUAL-USE</span></span>
+        <span>UPTIME <span id="uptimeVal">00:00:00</span></span>
+        <span>BATTERY <span id="battVal">87%</span></span>
+      </footer>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  function fitCanvas(cv){
+    var rect = cv.getBoundingClientRect();
+    var w = Math.max(1, Math.round(rect.width*dpr));
+    var h = Math.max(1, Math.round(rect.height*dpr));
+    if(cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+  }
+
+  /* ---------- mode switch ---------- */
+  var modeBtns = document.querySelectorAll('.mode-btn');
+  var views = { vehicle: document.getElementById('view-vehicle'), topdown: document.getElementById('view-topdown'), web: document.getElementById('view-web') };
+  modeBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      modeBtns.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      Object.keys(views).forEach(function(k){ views[k].classList.remove('active'); });
+      views[btn.dataset.view].classList.add('active');
+    });
+  });
+
+  var navItems = document.querySelectorAll('.nav-item');
+  var opsMode = 'ugv';
+  function applyOpsMode(){
+    document.querySelectorAll('.mode-chip').forEach(function(chip){
+      var isActive = chip.classList.contains(opsMode === 'ugv' ? 'ugv' : 'civ');
+      chip.classList.toggle('mode-active', isActive);
+    });
+    var opModeEl = document.getElementById('opMode');
+    if(opModeEl){
+      opModeEl.textContent = opsMode === 'ugv' ? 'UGV RECON · DRDO' : 'CIVILIAN ADAS · FLEET';
+    }
+  }
+  applyOpsMode();
+
+  navItems.forEach(function(item){
+    item.addEventListener('click', function(){
+      if(item.dataset.action === 'mode'){
+        opsMode = opsMode === 'ugv' ? 'civ' : 'ugv';
+        applyOpsMode();
+        item.classList.add('nav-pulse');
+        setTimeout(function(){ item.classList.remove('nav-pulse'); }, 700);
+        return;
+      }
+      navItems.forEach(function(n){ n.classList.remove('active'); });
+      item.classList.add('active');
+      var target = document.getElementById(item.dataset.target);
+      if(target){
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.classList.add('panel-highlight');
+        setTimeout(function(){ target.classList.remove('panel-highlight'); }, 900);
+      }
+    });
+  });
+
+  /* ---------- clock + uptime ---------- */
+  var clockEl = document.getElementById('clock');
+  var uptimeEl = document.getElementById('uptimeVal');
+  var uptimeSec = 0;
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function tickClock(){
+    var d = new Date();
+    clockEl.textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+    uptimeSec++;
+    var h = Math.floor(uptimeSec/3600), m = Math.floor((uptimeSec%3600)/60), s = uptimeSec%60;
+    uptimeEl.textContent = pad(h)+':'+pad(m)+':'+pad(s);
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ---------- shared telemetry state ---------- */
+  var state = { fps:42, lat:24, cells:440212, speed:18, cpu:54, gpu:71, pwr:38 };
+  function jitter(v, amt, min, max){
+    var nv = v + (Math.random()*2-1)*amt;
+    return Math.max(min, Math.min(max, nv));
+  }
+
+  /* ---------- instrument cluster (vehicle HUD) ---------- */
+  var clusterCanvas = document.getElementById('clusterCanvas');
+  var cctx = clusterCanvas.getContext('2d');
+  var alertToast = document.getElementById('alertToast');
+  var objLabel = { wall:'WALL', pole:'POLE', tree:'TREE', vehicle:'VEHICLE', pedestrian:'HUMAN' };
+
+  var staticObjs = [
+    { t:0.62, x:-0.42, sub:'wall' },
+    { t:0.30, x:0.46,  sub:'pole' },
+    { t:0.78, x:0.44,  sub:'tree' },
+    { t:0.18, x:-0.46, sub:'pole' }
+  ];
+  var dynamicObjs = [
+    { t:0.55, x:-0.14, v:-0.11, sub:'vehicle' },
+    { t:0.30, x:0.16,  v:0.09,  sub:'pedestrian' }
+  ];
+  var hazardObjs = [
+    { t:0.24, x:0.04,  type:'pothole', size:0.65 },
+    { t:0.40, x:-0.08, type:'pothole', size:1.45 },
+    { t:0.45, x:-0.24, type:'curb', size:1.10 },
+    { t:0.45, x:0.24,  type:'curb', size:0.82 }
+  ];
+
+  function clusterProject(t, x, w, h, carY){
+    var y = carY - t*h*0.80;
+    var perspective = 1.0 - t*0.58;
+    var px = w/2 + x*w*0.46*perspective;
+    return { x:px, y:y, scale: 1 - t*0.55 };
+  }
+
+  function roundRectPath(c, x, y, w, h, r){
+    c.beginPath();
+    c.moveTo(x+r,y);
+    c.arcTo(x+w,y,x+w,y+h,r);
+    c.arcTo(x+w,y+h,x,y+h,r);
+    c.arcTo(x,y+h,x,y,r);
+    c.arcTo(x,y,x+w,y,r);
+    c.closePath();
+  }
+  function drawGroundShadow(c, x, y, s, rx){
+    c.save();
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    c.beginPath();
+    c.ellipse(x, y + 2*s, rx*s, 3*s, 0, 0, Math.PI*2);
+    c.fill();
+    c.restore();
+  }
+  function drawCar(c, x, y, s, color){
+    drawGroundShadow(c, x, y, s, 11);
+    c.save(); c.translate(x,y); c.scale(s,s);
+    c.shadowColor = 'rgba(0,0,0,0.45)'; c.shadowBlur = 5; c.shadowOffsetY = 2;
+    c.fillStyle = color;
+    roundRectPath(c,-9,-16,18,32,5); c.fill();
+    c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetY = 0;
+    c.fillStyle = 'rgba(6,10,11,0.8)';
+    [[-10.2,-9],[8.6,-9],[-10.2,7],[8.6,7]].forEach(function(wp){
+      roundRectPath(c, wp[0], wp[1], 1.6, 6, 1); c.fill();
+    });
+    var glass = c.createLinearGradient(0,-9,0,1);
+    glass.addColorStop(0, 'rgba(10,18,19,0.9)');
+    glass.addColorStop(1, 'rgba(60,203,232,0.28)');
+    c.fillStyle = glass;
+    roundRectPath(c,-6,-9,12,10,2); c.fill();
+    c.restore();
+  }
+  function drawPedestrian(c, x, y, s, color){
+    drawGroundShadow(c, x, y, s, 6);
+    c.save(); c.translate(x,y); c.scale(s,s);
+    c.shadowColor = 'rgba(0,0,0,0.4)'; c.shadowBlur = 4; c.shadowOffsetY = 1;
+    c.fillStyle = color;
+    c.beginPath(); c.arc(0,-9,3.2,0,Math.PI*2); c.fill();
+    c.beginPath();
+    c.moveTo(-3.4,-5.5);
+    c.quadraticCurveTo(-4.2,2,-2.2,8);
+    c.lineTo(2.2,8);
+    c.quadraticCurveTo(4.2,2,3.4,-5.5);
+    c.quadraticCurveTo(0,-7.5,-3.4,-5.5);
+    c.closePath();
+    c.fill();
+    c.restore();
+  }
+  function drawObstacle(c, x, y, s, sub){
+    drawGroundShadow(c, x, y, s, sub === 'wall' ? 12 : 7);
+    c.save(); c.translate(x,y); c.scale(s,s);
+    c.fillStyle = 'rgba(220,233,231,0.55)';
+    c.strokeStyle = 'rgba(226,88,79,0.8)';
+    c.lineWidth = 1.3;
+    if(sub === 'tree'){
+      c.fillStyle = 'rgba(107,79,56,0.92)';
+      c.beginPath();
+      c.moveTo(-2.1,9); c.lineTo(-0.7,-1.5); c.lineTo(0.7,-1.5); c.lineTo(2.1,9);
+      c.closePath(); c.fill(); c.stroke();
+
+      var canopyGrad = c.createRadialGradient(-2,-12.5,1, 0,-10,8.5);
+      canopyGrad.addColorStop(0, 'rgba(128,174,100,0.96)');
+      canopyGrad.addColorStop(1, 'rgba(48,88,56,0.94)');
+      var lobes = [[0,-10,6],[-3.4,-7.3,3.9],[3.4,-7.3,3.9],[-1.6,-13.6,3.4],[1.8,-13.8,3.6]];
+      c.fillStyle = canopyGrad;
+      c.beginPath();
+      lobes.forEach(function(b){ c.moveTo(b[0]+b[2], b[1]); c.arc(b[0],b[1],b[2],0,Math.PI*2); });
+      c.fill();
+      c.strokeStyle = 'rgba(226,88,79,0.8)'; c.lineWidth = 1.3;
+      c.beginPath(); c.arc(0,-10.2,7.6,0,Math.PI*2); c.stroke();
+    } else if(sub === 'wall'){
+      roundRectPath(c,-11,-4.5,22,9,1.5); c.fill(); c.stroke();
+      c.strokeStyle = 'rgba(226,88,79,0.35)'; c.lineWidth = 0.8;
+      for(var seam=-7; seam<=7; seam+=3.5){
+        c.beginPath(); c.moveTo(seam,-4.5); c.lineTo(seam,4.5); c.stroke();
+      }
+      c.strokeStyle = 'rgba(220,233,231,0.4)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(-11,-4.5); c.lineTo(11,-4.5); c.stroke();
+    } else {
+      c.beginPath();
+      c.moveTo(-1.6,10); c.lineTo(-0.9,-9); c.lineTo(0.9,-9); c.lineTo(1.6,10);
+      c.closePath(); c.fill(); c.stroke();
+      c.beginPath(); c.arc(0,-10,2.2,0,Math.PI*2); c.fill(); c.stroke();
+      c.strokeStyle = 'rgba(220,233,231,0.5)'; c.lineWidth = 0.7;
+      c.beginPath(); c.moveTo(-0.4,-8.5); c.lineTo(-0.6,9); c.stroke();
+    }
+    c.restore();
+  }
+  function drawTag(c, x, y, text, color, fontScale){
+    fontScale = fontScale || 1;
+    c.font = Math.max(9, 9*dpr*fontScale) + 'px "IBM Plex Mono", "Consolas", monospace';
+    var tw = c.measureText(text).width;
+    var padX = 5*dpr, th = 9*dpr, padY = 3*dpr;
+    c.fillStyle = 'rgba(6,11,12,0.75)';
+    c.strokeStyle = 'rgba(220,233,231,0.12)';
+    c.lineWidth = 1;
+    c.fillRect(x - tw/2 - padX, y - th - padY*2, tw + padX*2, th + padY*1.8);
+    c.strokeRect(x - tw/2 - padX, y - th - padY*2, tw + padX*2, th + padY*1.8);
+    c.fillStyle = color;
+    c.textAlign = 'center';
+    c.textBaseline = 'bottom';
+    c.fillText(text, x, y - padY*0.4);
+  }
+
+  function renderCluster(time){
+    fitCanvas(clusterCanvas);
+    var w = clusterCanvas.width, h = clusterCanvas.height;
+    var carY = h*0.90;
+    cctx.clearRect(0,0,w,h);
+    cctx.fillStyle = '#0a1213';
+    cctx.fillRect(0,0,w,h);
+
+    var horizonY = carY - h*0.80;
+    var horizonGrad = cctx.createLinearGradient(0, Math.max(0,horizonY-40), 0, carY*0.55);
+    horizonGrad.addColorStop(0, 'rgba(60,203,232,0.08)');
+    horizonGrad.addColorStop(1, 'rgba(60,203,232,0)');
+    cctx.fillStyle = horizonGrad;
+    cctx.fillRect(0, 0, w, carY*0.55);
+
+    function ribbon(innerX, outerX, fill){
+      cctx.beginPath();
+      for(var i=0;i<=24;i++){ var t=i/24; var p=clusterProject(t,-innerX,w,h,carY); if(i===0) cctx.moveTo(p.x,p.y); else cctx.lineTo(p.x,p.y); }
+      for(var i=24;i>=0;i--){ var t=i/24; var p=clusterProject(t,-outerX,w,h,carY); cctx.lineTo(p.x,p.y); }
+      cctx.closePath(); cctx.fillStyle = fill; cctx.fill();
+      cctx.beginPath();
+      for(var i=0;i<=24;i++){ var t=i/24; var p=clusterProject(t,innerX,w,h,carY); if(i===0) cctx.moveTo(p.x,p.y); else cctx.lineTo(p.x,p.y); }
+      for(var i=24;i>=0;i--){ var t=i/24; var p=clusterProject(t,outerX,w,h,carY); cctx.lineTo(p.x,p.y); }
+      cctx.closePath(); cctx.fill();
+    }
+    var roadGrad = cctx.createLinearGradient(0, carY - h*0.80, 0, carY);
+    roadGrad.addColorStop(0, 'rgba(74,194,107,0.09)');
+    roadGrad.addColorStop(1, 'rgba(74,194,107,0.24)');
+    ribbon(0, 0.34, roadGrad);
+    ribbon(0.34, 0.58, 'rgba(198,152,92,0.4)');
+
+    cctx.strokeStyle = 'rgba(220,233,231,0.38)';
+    cctx.lineWidth = 1.6*dpr;
+    [-1,1].forEach(function(side){
+      cctx.beginPath();
+      for(var i=0;i<=24;i++){
+        var t=i/24; var p=clusterProject(t, side*0.34, w,h,carY);
+        if(i===0) cctx.moveTo(p.x,p.y); else cctx.lineTo(p.x,p.y);
+      }
+      cctx.stroke();
+    });
+    cctx.strokeStyle = 'rgba(156,140,110,0.4)';
+    cctx.lineWidth = 1.2*dpr;
+    [-1,1].forEach(function(side){
+      cctx.beginPath();
+      for(var i=0;i<=24;i++){
+        var t=i/24; var p=clusterProject(t, side*0.58, w,h,carY);
+        if(i===0) cctx.moveTo(p.x,p.y); else cctx.lineTo(p.x,p.y);
+      }
+      cctx.stroke();
+    });
+
+    cctx.save();
+    cctx.setLineDash([9*dpr, 13*dpr]);
+    cctx.lineDashOffset = -(time*0.012) % (22*dpr);
+    cctx.strokeStyle = 'rgba(220,233,231,0.55)';
+    cctx.lineWidth = 2*dpr;
+    cctx.beginPath();
+    for(var li=0; li<=24; li++){
+      var lt = li/24; var lp = clusterProject(lt, 0, w, h, carY);
+      if(li===0) cctx.moveTo(lp.x, lp.y); else cctx.lineTo(lp.x, lp.y);
+    }
+    cctx.stroke();
+    cctx.restore();
+
+    staticObjs.forEach(function(o){
+      var p = clusterProject(o.t,o.x,w,h,carY);
+      drawObstacle(cctx, p.x, p.y, p.scale*dpr*(o.sub === 'tree' ? 1.55 : o.sub === 'pole' ? 1.45 : 1.4), o.sub);
+      drawTag(cctx, p.x, p.y - 18*p.scale*dpr, o.sub.toUpperCase(), 'rgba(220,233,231,0.65)');
+    });
+
+    hazardObjs.forEach(function(o, idx){
+      var p = clusterProject(o.t,o.x,w,h,carY);
+      var pulse = 0.5 + 0.5*Math.sin(time*0.003 + idx);
+      var s = p.scale*dpr;
+      if(o.type === 'pothole'){
+        var r = (5+1.6*pulse)*s*(o.size || 1);
+        var holeGrad = cctx.createRadialGradient(p.x,p.y,0, p.x,p.y,r);
+        holeGrad.addColorStop(0, 'rgba(4,4,7,0.92)');
+        holeGrad.addColorStop(0.7, 'rgba(22,14,26,0.75)');
+        holeGrad.addColorStop(1, 'rgba(22,14,26,0)');
+        cctx.fillStyle = holeGrad;
+        cctx.beginPath(); cctx.arc(p.x,p.y,r,0,Math.PI*2); cctx.fill();
+        cctx.strokeStyle = 'rgba(178,107,240,' + (0.55+0.35*pulse).toFixed(2) + ')';
+        cctx.lineWidth = Math.max(1, 1.6*s);
+        cctx.beginPath(); cctx.arc(p.x,p.y,r*0.88,0,Math.PI*2); cctx.stroke();
+      } else {
+        var halfLen = 9*s*(o.size || 1);
+        var curbW = 3*s*(o.size || 1);
+        cctx.fillStyle = 'rgba(178,176,168,0.92)';
+        cctx.fillRect(p.x-curbW/2, p.y-halfLen, curbW, halfLen*2);
+        cctx.fillStyle = 'rgba(224,222,212,0.9)';
+        cctx.fillRect(p.x-curbW/2, p.y-halfLen, curbW*0.4, halfLen*2);
+        cctx.fillStyle = 'rgba(85,83,79,0.65)';
+        cctx.fillRect(p.x+curbW/2-curbW*0.28, p.y-halfLen, curbW*0.28, halfLen*2);
+        cctx.strokeStyle = 'rgba(178,107,240,' + (0.7+0.3*pulse).toFixed(2) + ')';
+        cctx.lineWidth = Math.max(1, 0.5*s);
+        cctx.strokeRect(p.x-curbW/2, p.y-halfLen, curbW, halfLen*2);
+      }
+      drawTag(cctx, p.x, p.y - 12*s, o.type.toUpperCase(), 'rgba(178,107,240,0.9)');
+    });
+
+    var nearest = null;
+    dynamicObjs.forEach(function(o){
+      o.t += o.v * 0.003;
+      if(o.t > 0.92 || o.t < 0.1){ o.v *= -1; }
+      var p = clusterProject(o.t,o.x,w,h,carY);
+      var distM = o.t*100;
+      if(!nearest || distM < nearest.dist){ nearest = { dist:distM, sub:o.sub }; }
+      var near = distM < 25;
+      var color = near ? '#e2a23b' : 'rgba(220,233,231,0.85)';
+      if(o.sub === 'vehicle'){ drawCar(cctx, p.x, p.y, p.scale*dpr*0.95, color); }
+      else { drawPedestrian(cctx, p.x, p.y, p.scale*dpr*1.45, color); }
+      drawTag(cctx, p.x, p.y - 22*p.scale*dpr, o.sub.toUpperCase(), color);
+    });
+
+    drawCar(cctx, w/2, carY, dpr*1.15, '#dce9e7');
+
+    if(nearest && nearest.dist < 25){
+      alertToast.textContent = '⚠ ' + objLabel[nearest.sub] + ' — ' + nearest.dist.toFixed(0) + 'm AHEAD';
+      alertToast.classList.add('show');
+    } else {
+      alertToast.classList.remove('show');
+    }
+  }
+
+  function updateClusterReadouts(){
+    document.getElementById('speedVal').textContent = Math.round(state.speed);
+    document.getElementById('fpsVal').textContent = Math.round(state.fps);
+    document.getElementById('latVal').textContent = Math.round(state.lat) + 'ms';
+    document.getElementById('cellsVal').textContent = Math.round(state.cells).toLocaleString();
+  }
+
+  function clusterLoop(time){
+    renderCluster(time);
+    requestAnimationFrame(clusterLoop);
+  }
+  if(reduceMotion){
+    renderCluster(0);
+    setInterval(function(){ renderCluster(performance.now()); }, 1200);
+  } else {
+    requestAnimationFrame(clusterLoop);
+  }
+
+  /* ---------- top-down LiDAR radar ---------- */
+  var radarCanvas = document.getElementById('radarCanvas');
+  var rctx = radarCanvas.getContext('2d');
+  var alertToastTD = document.getElementById('alertToastTD');
+  var RADAR_MAX_RANGE = 100; // meters
+  var RADAR_RINGS = [10, 30, 60, 100]; // the same 4 adaptive-band boundaries as the rest of the console
+
+  // Vehicle route: straight -> controlled right turn -> straight.
+  // Keep the original circular LiDAR presentation intact, but make the
+  // motion read as a vehicle following a road rather than a wobbling disc.
+  var _egoHeadingNow = 0;
+  function getEgoHeading(time){
+    var sec = (time * 0.0012) % 60;
+    if(sec < 14) return 0;
+    if(sec < 22){
+      var q = (sec - 14) / 8;
+      return 90 * (q*q*(3-2*q));
+    }
+    if(sec < 45) return 90;
+    if(sec < 53){
+      var q2 = (sec - 45) / 8;
+      return 90 + 90 * (q2*q2*(3-2*q2));
+    }
+    return 180;
+  }
+
+  function polarProject(rangeM, angleDeg, w, h){
+    var cx = w/2, cy = h/2;
+    var maxR = Math.min(w,h)/2 * 0.94;
+    var rr = Math.min(1, rangeM / RADAR_MAX_RANGE) * maxR;
+    var rad = (angleDeg - _egoHeadingNow) * Math.PI/180; // 0deg = forward/up, clockwise positive
+    var scale = 1 - (rangeM/RADAR_MAX_RANGE)*0.55; // near = bigger, far = smaller
+    return { x: cx + rr*Math.sin(rad), y: cy - rr*Math.cos(rad), scale: Math.max(0.35, scale) };
+  }
+
+  function worldToPolarDeg(wx, wy){
+    return { range: Math.sqrt(wx*wx + wy*wy), angle: Math.atan2(wx, -wy) * 180/Math.PI };
+  }
+  function polarDegToWorld(range, angleDeg){
+    var rad = angleDeg*Math.PI/180;
+    return { x: range*Math.sin(rad), y: -range*Math.cos(rad) };
+  }
+
+  var radarStatic = [
+    { range:45, angle:-110, sub:'wall' },
+    { range:26, angle:-40,  sub:'pole' },
+    { range:38, angle:140,  sub:'tree' },
+    { range:62, angle:-160, sub:'pole' },
+    { range:52, angle:70,   sub:'wall' },
+    { range:68, angle:-80,  sub:'tree' }
+  ];
+  // Dynamic objects travel in straight lines through fixed world-space
+  // Cartesian coordinates -- real traffic doesn't orbit the ego vehicle.
+  // Each respawns at a fresh edge position heading roughly back across the
+  // scene once it exits range, so the console keeps "detecting" different
+  // encounters over time instead of the same objects circling forever.
+  var radarDynamic = [
+    { wx:7.5,  wy:20.7,  vx:0.025, vy:0.01,   sub:'vehicle',    trail:[], range:0, angle:0 },
+    { wx:-23,  wy:19.3,  vx:-0.03, vy:-0.015, sub:'pedestrian', trail:[], range:0, angle:0 },
+    { wx:30.9, wy:-36.8, vx:-0.02, vy:0.03,   sub:'vehicle',    trail:[], range:0, angle:0 }
+  ];
+  (function initRadarDynamic(){
+    radarDynamic.forEach(function(o){
+      var polar = worldToPolarDeg(o.wx, o.wy);
+      o.range = polar.range; o.angle = polar.angle;
+    });
+  })();
+  var radarHazards = [
+    { range:15, angle:20,  type:'pothole', size:0.65 },
+    { range:30, angle:-4, type:'pothole', size:1.45 },
+    { range:34, angle:-20, type:'curb', size:1.10 },
+    { range:42, angle:100, type:'curb', size:0.82 }
+  ];
+  // Four road "arms" forming a crossroad, each rendered as clean concentric
+  // arc segments -- this is what a real spinning multi-channel LiDAR's scan
+  // rings actually look like from above: continuous curved streaks visible
+  // only where they cross the physical road surface (the reference image's
+  // signature look), not a scatter of independent points. One arm is gold
+  // instead of magenta, matching the reference's mixed road-surface classes.
+  var RADAR_ARMS = [
+    { center:0,   color:'rgba(199,46,173,' },
+    { center:90,  color:'rgba(196,148,58,' },
+    { center:180, color:'rgba(199,46,173,' },
+    { center:270, color:'rgba(199,46,173,' }
+  ];
+  var ARM_HALF_WIDTH = 17; // degrees
+  var radarRingRadii = [];
+  (function initRingRadii(){
+    var N = 50;
+    for(var i=0;i<N;i++){
+      radarRingRadii.push(RADAR_MAX_RANGE * Math.pow((i+1)/N, 1.7));
+    }
+  })();
+
+  // Vegetation as dense, organic blobby clusters sitting in the diagonal
+  // gaps between the road arms (roadside tree lines) -- varied point sizes
+  // so it reads as canopy texture, not a uniform dot grid.
+  var radarVegetation = [];
+  (function initVegetation(){
+    var diagonals = [45, 135, 225, 315];
+    diagonals.forEach(function(diag){
+      var clustersHere = 3;
+      for(var c=0;c<clustersHere;c++){
+        var clusterAngle = diag + (Math.random()-0.5)*24;
+        var clusterRange = 18 + Math.random()*68;
+        var n = 130 + Math.floor(Math.random()*90);
+        for(var i=0;i<n;i++){
+          var rr = clusterRange + (Math.random()-0.5)*22;
+          var aa = clusterAngle + (Math.random()-0.5)*26;
+          if(rr < 4) continue;
+          radarVegetation.push({ range:rr, angle:aa, seed:Math.random()*Math.PI*2, sizeMul:0.7+Math.random()*1.6 });
+        }
+      }
+    });
+  })();
+
+  // A handful of small parked-vehicle markers scattered along the road
+  // arms -- background texture (untagged, unlike the actively tracked
+  // vehicles), matching the reference's scattered roadside blue markers.
+  var radarParkedVehicles = [];
+  (function initParkedVehicles(){
+    RADAR_ARMS.forEach(function(arm){
+      var count = 2 + Math.floor(Math.random()*2);
+      for(var i=0;i<count;i++){
+        var range = 14 + Math.random()*74;
+        var angle = arm.center + (Math.random()<0.5?-1:1)*(ARM_HALF_WIDTH*0.55 + Math.random()*ARM_HALF_WIDTH*0.4);
+        radarParkedVehicles.push({ range:range, angle:angle, heading:Math.random()*360 });
+      }
+    });
+  })();
+
+  function renderRadar(time){
+    fitCanvas(radarCanvas);
+    var w = radarCanvas.width, h = radarCanvas.height;
+    _egoHeadingNow = getEgoHeading(time);
+    rctx.clearRect(0,0,w,h);
+    rctx.fillStyle = '#a9a9a9'; // matches the SemanticKITTI reference's light-gray backdrop
+    rctx.fillRect(0,0,w,h);
+
+    var cx = w/2, cy = h/2;
+    var maxR = Math.min(w,h)/2 * 0.94;
+
+    // road arms -- clean concentric arc segments, the actual signature of a
+    // spinning LiDAR's scan rings crossing a road surface. Rotated by the
+    // ego heading along with everything else, so the crossroad visibly
+    // turns under the car as it steers.
+    RADAR_ARMS.forEach(function(arm){
+      var halfW = ARM_HALF_WIDTH*Math.PI/180;
+      var centerCanvasRad = (arm.center - _egoHeadingNow - 90)*Math.PI/180;
+      radarRingRadii.forEach(function(rng, ri){
+        if(Math.random() < 0.12) return; // sparse gaps -- real returns, not a CAD ring
+        var rr = Math.min(1, rng/RADAR_MAX_RANGE) * maxR;
+        var flicker = 0.55 + 0.45*Math.sin(time*0.001 + ri*0.7);
+        rctx.beginPath();
+        rctx.arc(cx, cy, rr, centerCanvasRad-halfW, centerCanvasRad+halfW);
+        rctx.strokeStyle = arm.color + (0.5*flicker+0.3).toFixed(2) + ')';
+        rctx.lineWidth = Math.max(1, 1.8*dpr*(1-(rng/RADAR_MAX_RANGE)*0.3));
+        rctx.stroke();
+      });
+    });
+
+    // vegetation clusters in the diagonal gaps between arms -- varied point
+    // sizes give it canopy-like texture instead of a uniform dot grid
+    radarVegetation.forEach(function(p){
+      var proj = polarProject(p.range, p.angle, w, h);
+      var flicker = 0.5 + 0.5*Math.sin(time*0.0015 + p.seed);
+      rctx.fillStyle = 'rgba(45,110,55,' + (0.55*flicker+0.3).toFixed(2) + ')';
+      var s = 2.2*dpr*proj.scale*p.sizeMul;
+      rctx.fillRect(proj.x, proj.y, s, s);
+    });
+
+    // small parked-vehicle markers scattered along the road arms --
+    // background texture, deliberately untagged (unlike the actively
+    // tracked vehicles below)
+    radarParkedVehicles.forEach(function(pv){
+      var p = polarProject(pv.range, pv.angle, w, h);
+      rctx.save();
+      rctx.translate(p.x, p.y);
+      rctx.rotate((pv.heading - _egoHeadingNow)*Math.PI/180);
+      var s = p.scale*dpr*1.1;
+      rctx.fillStyle = 'rgba(34,85,201,0.8)';
+      roundRectPath(rctx, -3.6*s, -6*s, 7.2*s, 12*s, 1.5*s);
+      rctx.fill();
+      rctx.restore();
+    });
+
+    // range rings -- the 4 adaptive bands, labeled, drawn over the point
+    // cloud so the adaptive-resolution boundaries read clearly against it
+    rctx.font = Math.max(12,12*dpr) + 'px "IBM Plex Mono", Consolas, monospace';
+    RADAR_RINGS.forEach(function(rng){
+      var rr = (rng/RADAR_MAX_RANGE)*maxR;
+      rctx.beginPath();
+      rctx.arc(cx, cy, rr, 0, Math.PI*2);
+      rctx.strokeStyle = 'rgba(20,24,24,0.22)';
+      rctx.lineWidth = 1*dpr;
+      rctx.stroke();
+      rctx.fillStyle = 'rgba(20,24,24,0.6)';
+      rctx.textAlign = 'left';
+      rctx.textBaseline = 'bottom';
+      rctx.fillText(rng+'M', cx + 4*dpr, cy - rr - 3*dpr);
+    });
+
+    // static obstacles -- wall / pole / tree, each individually labeled
+    radarStatic.forEach(function(o){
+      var p = polarProject(o.range, o.angle, w, h);
+      drawObstacle(rctx, p.x, p.y, p.scale*dpr*(o.sub === 'tree' ? 2.15 : o.sub === 'pole' ? 1.95 : 1.8), o.sub);
+      drawTag(rctx, p.x, p.y - 30*p.scale*dpr, (o.sub === 'pedestrian' ? 'HUMAN' : o.sub.toUpperCase()), 'rgba(230,233,231,0.9)', 1.5);
+    });
+
+    // elevation hazards -- pothole / curb, each individually labeled
+    radarHazards.forEach(function(o, idx){
+      var p = polarProject(o.range, o.angle, w, h);
+      var pulse = 0.5 + 0.5*Math.sin(time*0.003 + idx);
+      var s = p.scale*dpr*1.7*(o.size || 1);
+      if(o.type === 'pothole'){
+        var r = (5+1.6*pulse)*s*(o.size || 1);
+        var holeGrad = rctx.createRadialGradient(p.x,p.y,0, p.x,p.y,r);
+        holeGrad.addColorStop(0, 'rgba(4,4,7,0.92)');
+        holeGrad.addColorStop(0.7, 'rgba(22,14,26,0.75)');
+        holeGrad.addColorStop(1, 'rgba(22,14,26,0)');
+        rctx.fillStyle = holeGrad;
+        rctx.beginPath(); rctx.arc(p.x,p.y,r,0,Math.PI*2); rctx.fill();
+        rctx.strokeStyle = 'rgba(178,107,240,' + (0.55+0.35*pulse).toFixed(2) + ')';
+        rctx.lineWidth = Math.max(1, 1.6*s);
+        rctx.beginPath(); rctx.arc(p.x,p.y,r*0.88,0,Math.PI*2); rctx.stroke();
+      } else {
+        var halfLen = 7*s, curbW = 2.6*s;
+        rctx.save();
+        rctx.translate(p.x, p.y);
+        rctx.rotate((o.angle - _egoHeadingNow)*Math.PI/180);
+        rctx.fillStyle = 'rgba(178,176,168,0.92)';
+        rctx.fillRect(-curbW/2, -halfLen, curbW, halfLen*2);
+        rctx.strokeStyle = 'rgba(178,107,240,' + (0.7+0.3*pulse).toFixed(2) + ')';
+        rctx.lineWidth = Math.max(1, 0.5*s);
+        rctx.strokeRect(-curbW/2, -halfLen, curbW, halfLen*2);
+        rctx.restore();
+      }
+      drawTag(rctx, p.x, p.y - 12*s, o.type.toUpperCase(), 'rgba(178,107,240,0.95)', 1.5);
+    });
+
+    // dynamic objects -- vehicle / pedestrian, straight-line motion through
+    // fixed world-space coordinates (no orbiting), with motion trails, each
+    // individually labeled. Respawns at a new edge once out of range, so the
+    // scene keeps encountering different traffic over time.
+    var nearestTD = null;
+    radarDynamic.forEach(function(o){
+      o.wx += o.vx; o.wy += o.vy;
+      var polar = worldToPolarDeg(o.wx, o.wy);
+      if(polar.range > RADAR_MAX_RANGE*0.92 || polar.range < 2){
+        var edgeAngle = Math.random()*360;
+        var spawn = polarDegToWorld(RADAR_MAX_RANGE*0.8, edgeAngle);
+        o.wx = spawn.x; o.wy = spawn.y;
+        var dir = (edgeAngle + 180 + (Math.random()-0.5)*50) * Math.PI/180;
+        var speed = 0.02 + Math.random()*0.035;
+        o.vx = speed*Math.sin(dir);
+        o.vy = -speed*Math.cos(dir);
+        o.trail = [];
+        polar = worldToPolarDeg(o.wx, o.wy);
+      }
+      o.range = polar.range; o.angle = polar.angle;
+      o.trail.push({ range:o.range, angle:o.angle });
+      if(o.trail.length > 10) o.trail.shift();
+
+      o.trail.forEach(function(pt, idx){
+        var tp = polarProject(pt.range, pt.angle, w, h);
+        var alpha = (idx+1)/o.trail.length * 0.55;
+        rctx.fillStyle = 'rgba(226,162,59,' + alpha.toFixed(2) + ')';
+        var sz = 4.5*dpr*((idx+1)/o.trail.length)*tp.scale;
+        rctx.beginPath(); rctx.arc(tp.x, tp.y, sz, 0, Math.PI*2); rctx.fill();
+      });
+
+      var p = polarProject(o.range, o.angle, w, h);
+      if(!nearestTD || o.range < nearestTD.range){ nearestTD = { range:o.range, sub:o.sub }; }
+      var near = o.range < 20;
+      // icon color needs contrast against the light-gray canvas; tag color
+      // needs contrast against drawTag's own dark label box -- not the same
+      var iconColor = near ? '#e2a23b' : 'rgba(30,34,34,0.85)';
+      var tagColor = near ? '#e2a23b' : 'rgba(230,233,231,0.9)';
+      if(o.sub === 'vehicle'){ drawCar(rctx, p.x, p.y, p.scale*dpr*1.7, iconColor); }
+      else { drawPedestrian(rctx, p.x, p.y, p.scale*dpr*2.15, iconColor); }
+      drawTag(rctx, p.x, p.y - 34*p.scale*dpr, (o.sub === 'pedestrian' ? 'HUMAN' : o.sub.toUpperCase()), tagColor, 1.5);
+    });
+
+    // ego vehicle, fixed at center -- blue marker, matching the reference
+    // image's sensor-vehicle icon, sized up to stay visible against the
+    // now-larger surrounding icons
+    drawCar(rctx, cx, cy, dpr*2.25, '#2255c9');
+
+    if(nearestTD && nearestTD.range < 20){
+      alertToastTD.textContent = '⚠ ' + (nearestTD.sub === 'pedestrian' ? 'HUMAN' : objLabel[nearestTD.sub]) + ' — ' + nearestTD.range.toFixed(0) + 'm';
+      alertToastTD.classList.add('show');
+    } else {
+      alertToastTD.classList.remove('show');
+    }
+  }
+
+  function updateRadarReadouts(){
+    document.getElementById('fpsValTD').textContent = Math.round(state.fps);
+    document.getElementById('latValTD').textContent = Math.round(state.lat) + 'ms';
+    document.getElementById('cellsValTD').textContent = Math.round(state.cells).toLocaleString();
+  }
+
+  function radarLoop(time){
+    renderRadar(time);
+    requestAnimationFrame(radarLoop);
+  }
+  if(reduceMotion){
+    renderRadar(0);
+    setInterval(function(){ renderRadar(performance.now()); }, 1200);
+  } else {
+    requestAnimationFrame(radarLoop);
+  }
+
+  /* ---------- web deck sync ---------- */
+  function renderWeb(){
+    var feedMetaEl = document.getElementById('feedMeta');
+    if(gridMode === 'uniform'){
+      var dFps = 6 + Math.random()*4;
+      var dLat = 160 + Math.random()*70;
+      feedMetaEl.textContent = 'FPS ' + Math.round(dFps) + ' · ' + Math.round(dLat) + 'ms · OVERLOADED';
+      feedMetaEl.style.color = 'var(--danger)';
+    } else {
+      feedMetaEl.textContent = 'FPS ' + Math.round(state.fps) + ' · ' + Math.round(state.lat) + 'ms';
+      feedMetaEl.style.color = '';
+    }
+    document.getElementById('cellsValWeb').textContent = Math.round(state.cells).toLocaleString();
+
+    var fpsPct = Math.max(0, Math.min(100, (state.fps/60)*100));
+    var latPct = Math.max(0, Math.min(100, (state.lat/60)*100));
+    document.getElementById('fpsGaugeFill').setAttribute('stroke-dashoffset', 100-fpsPct);
+    document.getElementById('latGaugeFill').setAttribute('stroke-dashoffset', 100-latPct);
+    document.getElementById('fpsGaugeVal').textContent = Math.round(state.fps);
+    document.getElementById('latGaugeVal').textContent = Math.round(state.lat);
+
+    document.getElementById('cpuBar').style.width = state.cpu + '%';
+    document.getElementById('gpuBar').style.width = state.gpu + '%';
+    document.getElementById('pwrBar').style.width = state.pwr + '%';
+    document.getElementById('cpuVal').textContent = Math.round(state.cpu) + '%';
+    document.getElementById('gpuVal').textContent = Math.round(state.gpu) + '%';
+    document.getElementById('pwrVal').textContent = Math.round(state.pwr) + '%';
+  }
+
+  function tickState(){
+    state.fps = jitter(state.fps, 1.4, 36, 48);
+    state.lat = jitter(state.lat, 1.6, 16, 34);
+    state.cells = jitter(state.cells, 900, 430000, 452000);
+    state.speed = jitter(state.speed, 0.6, 8, 26);
+    state.cpu = jitter(state.cpu, 1.2, 40, 68);
+    state.gpu = jitter(state.gpu, 1.4, 55, 84);
+    state.pwr = jitter(state.pwr, 0.8, 30, 46);
+    updateClusterReadouts();
+    updateRadarReadouts();
+    renderWeb();
+  }
+  tickState();
+  setInterval(tickState, reduceMotion ? 900 : 220);
+
+  /* ---------- GPS drift ---------- */
+  var gpsBase = { lat:28.6139, lon:77.2090 };
+  var gpsEl = document.getElementById('gpsVal');
+  setInterval(function(){
+    var lat = gpsBase.lat + (Math.random()*2-1)*0.0006;
+    var lon = gpsBase.lon + (Math.random()*2-1)*0.0006;
+    gpsEl.textContent = lat.toFixed(4) + '° N, ' + lon.toFixed(4) + '° E';
+  }, 2600);
+
+  var battEl = document.getElementById('battVal');
+  var batt = 87;
+  setInterval(function(){
+    batt = Math.max(82, Math.min(90, batt + (Math.random()*2-1)));
+    battEl.textContent = Math.round(batt) + '%';
+  }, 4000);
+
+  /* ---------- detection log ---------- */
+  var logList = document.getElementById('logList');
+  var classes = [
+    { key:'drivable', label:'Drivable Terrain' },
+    { key:'nondrivable', label:'Non-Drivable Terrain' },
+    { key:'static', label:'Static · Wall' },
+    { key:'static', label:'Static · Pole' },
+    { key:'static', label:'Static · Tree' },
+    { key:'dynamic', label:'Dynamic · Vehicle' },
+    { key:'dynamic', label:'Dynamic · Human' },
+    { key:'hazard', label:'Hazard · Curb' },
+    { key:'hazard', label:'Hazard · Pothole' }
+  ];
+  function addLogRow(){
+    var c = classes[Math.floor(Math.random()*classes.length)];
+    var d = new Date();
+    var dist = (Math.random()*90 + 4).toFixed(1);
+    var conf = (Math.random()*14 + 85).toFixed(1);
+    var row = document.createElement('div');
+    row.className = 'log-row';
+    row.innerHTML =
+      '<span class="log-time">' + pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()) + '</span>' +
+      '<span class="log-class ' + c.key + '">' + c.label + '</span>' +
+      '<span class="log-dist">' + dist + 'm</span>' +
+      '<span class="log-conf">' + conf + '%</span>';
+    logList.insertBefore(row, logList.firstChild);
+    while(logList.children.length > 8){ logList.removeChild(logList.lastChild); }
+  }
+  for(var i=0;i<5;i++){ addLogRow(); }
+  setInterval(addLogRow, 2400);
+
+  /* ---------- point cloud canvas ---------- */
+  var canvas = document.getElementById('pointCloudCanvas');
+  var ctx = canvas.getContext('2d');
+
+  var roadPts = [];
+  var shoulderPts = [];
+  var sideClusters = [];
+  var hazardPts = [];
+  (function initScene(){
+    for(var i=0;i<340;i++){
+      var t = Math.random();
+      var lane = (Math.random()<0.5? -1:1) * (0.04 + Math.random()*0.12);
+      roadPts.push({ t:t, lane:lane, seed:Math.random()*Math.PI*2 });
+    }
+    for(var i=0;i<160;i++){
+      var t2 = Math.random();
+      var side2 = (Math.random()<0.5? -1:1) * (0.17 + Math.random()*0.09);
+      shoulderPts.push({ t:t2, lane:side2, seed:Math.random()*Math.PI*2 });
+    }
+    var sides = [ -1, 1 ];
+    var subs = ['wall','pole','tree'];
+    sides.forEach(function(side){
+      subs.forEach(function(sub, c){
+        var baseT = 0.16 + c*0.27 + Math.random()*0.06;
+        var baseX = side * (0.32 + Math.random()*0.13);
+        var count = sub === 'wall' ? 34 : (sub === 'tree' ? 24 : 10);
+        for(var i=0;i<count;i++){
+          var dx, dt;
+          if(sub === 'wall'){ dx = (Math.random()-0.5)*0.05; dt = (Math.random()-0.5)*0.16; }
+          else if(sub === 'pole'){ dx = (Math.random()-0.5)*0.012; dt = (Math.random()-0.5)*0.02; }
+          else { var ang = Math.random()*Math.PI*2, rad = Math.random()*0.045; dx = Math.cos(ang)*rad; dt = Math.sin(ang)*rad*0.6; }
+          sideClusters.push({ t: baseT+dt, x: baseX+dx, sub:sub, seed:Math.random()*Math.PI*2 });
+        }
+      });
+    });
+    hazardPts.push({ type:'pothole', t:0.30, x:0.05 });
+    hazardPts.push({ type:'pothole', t:0.58, x:-0.07 });
+    hazardPts.push({ type:'curb', t:0.20, x:0.155 });
+    hazardPts.push({ type:'curb', t:0.46, x:-0.155 });
+    hazardPts.push({ type:'curb', t:0.70, x:0.16 });
+  })();
+
+  var dynObjs = [
+    { t:0.75, x:-0.08, v:-0.09, sub:'vehicle', trail:[] },
+    { t:0.4,  x:0.13,  v:0.055, sub:'pedestrian', trail:[] }
+  ];
+
+  var gridMode = 'adaptive';
+  var uniformFillerPts = [];
+  (function initUniformFiller(){
+    for(var i=0;i<2600;i++){
+      uniformFillerPts.push({ t: Math.random(), x: (Math.random()*2-1)*0.95, seed: Math.random()*Math.PI*2 });
+    }
+  })();
+  document.querySelectorAll('.toggle-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.toggle-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      gridMode = btn.dataset.grid;
+    });
+  });
+
+  function renderCloud(time){
+    fitCanvas(canvas);
+    var w = canvas.width, h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = '#0c1516';
+    ctx.fillRect(0,0,w,h);
+
+    // faint perspective grid
+    ctx.strokeStyle = 'rgba(60,203,232,0.06)';
+    ctx.lineWidth = 1;
+    for(var gy=0; gy<=10; gy++){
+      var yy = h - (gy/10)*h;
+      ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(w,yy); ctx.stroke();
+    }
+
+    function project(t, x){
+      var y = h - t*h;
+      var perspective = 0.35 + t*0.65;
+      var px = w/2 + x*w*perspective;
+      return { x:px, y:y, s: 1.4 + t*2.2 };
+    }
+
+    // uniform-mode filler — dense coverage everywhere, including irrelevant space
+    if(gridMode === 'uniform'){
+      uniformFillerPts.forEach(function(p){
+        var proj = project(p.t, p.x);
+        var flicker = 0.5 + 0.5*Math.sin(time*0.001 + p.seed);
+        ctx.fillStyle = 'rgba(226,88,79,' + (0.14*flicker+0.09).toFixed(2) + ')';
+        ctx.fillRect(proj.x, proj.y, proj.s*0.7, proj.s*0.7);
+      });
+    }
+
+    // drivable terrain points
+    roadPts.forEach(function(p){
+      var proj = project(p.t, p.lane);
+      var flicker = 0.55 + 0.45*Math.sin(time*0.002 + p.seed);
+      ctx.fillStyle = 'rgba(74,194,107,' + (0.35*flicker+0.15).toFixed(2) + ')';
+      ctx.fillRect(proj.x, proj.y, proj.s, proj.s);
+    });
+
+    // non-drivable shoulder terrain
+    shoulderPts.forEach(function(p){
+      var proj = project(p.t, p.lane);
+      var flicker = 0.5 + 0.5*Math.sin(time*0.0018 + p.seed);
+      ctx.fillStyle = 'rgba(140,122,99,' + (0.32*flicker+0.16).toFixed(2) + ')';
+      ctx.fillRect(proj.x, proj.y, proj.s, proj.s);
+    });
+
+    // static obstacles — walls, poles, trees
+    sideClusters.forEach(function(p){
+      var proj = project(p.t, p.x);
+      var flicker = 0.5 + 0.5*Math.sin(time*0.0015 + p.seed);
+      var size = proj.s + (p.sub === 'wall' ? 1.4 : (p.sub === 'tree' ? 1 : 0.4));
+      ctx.fillStyle = 'rgba(226,88,79,' + (0.42*flicker+0.26).toFixed(2) + ')';
+      ctx.fillRect(proj.x, proj.y, size, size);
+    });
+
+    // elevation hazards — curbs, potholes
+    hazardPts.forEach(function(p, idx){
+      var proj = project(p.t, p.x);
+      var pulse = 0.5 + 0.5*Math.sin(time*0.0025 + idx*1.3);
+      ctx.fillStyle = 'rgba(178,107,240,' + (0.35+0.4*pulse).toFixed(2) + ')';
+      if(p.type === 'pothole'){
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, (proj.s+2)*(0.8+0.4*pulse), 0, Math.PI*2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(proj.x - (proj.s+7), proj.y-1, (proj.s+7)*2, 2);
+      }
+    });
+
+    // dynamic objects — vehicles, pedestrians (with motion trail)
+    dynObjs.forEach(function(o){
+      o.t += o.v * 0.0025;
+      if(o.t > 0.92 || o.t < 0.12){ o.v *= -1; }
+      o.trail.push({ t:o.t, x:o.x });
+      if(o.trail.length > 10) o.trail.shift();
+      o.trail.forEach(function(pt, idx){
+        var proj = project(pt.t, pt.x);
+        var alpha = (idx+1)/o.trail.length * 0.8;
+        ctx.fillStyle = 'rgba(226,162,59,' + alpha.toFixed(2) + ')';
+        var scale = (idx+1)/o.trail.length;
+        var w2 = (o.sub === 'vehicle' ? (proj.s+4) : (proj.s+1.5)) * scale;
+        var h2 = (o.sub === 'vehicle' ? (proj.s+2) : (proj.s+5)) * scale;
+        ctx.fillRect(proj.x-w2/2, proj.y-h2/2, w2, h2);
+      });
+    });
+
+    // scanning sweep bar
+    var sweepY = (Math.sin(time*0.0006) * 0.5 + 0.5) * h;
+    var grad = ctx.createLinearGradient(0, sweepY-40, 0, sweepY+40);
+    grad.addColorStop(0, 'rgba(60,203,232,0)');
+    grad.addColorStop(0.5, 'rgba(60,203,232,0.10)');
+    grad.addColorStop(1, 'rgba(60,203,232,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, sweepY-40, w, 80);
+
+    // vehicle marker
+    ctx.fillStyle = '#dce9e7';
+    var vx = w/2, vy = h-6*dpr;
+    ctx.beginPath();
+    ctx.moveTo(vx, vy-10*dpr);
+    ctx.lineTo(vx+7*dpr, vy+6*dpr);
+    ctx.lineTo(vx-7*dpr, vy+6*dpr);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  var cloudFrameCounter = 0;
+  function loop(time){
+    cloudFrameCounter++;
+    if(gridMode === 'uniform' && cloudFrameCounter % 6 !== 0){
+      requestAnimationFrame(loop);
+      return;
+    }
+    renderCloud(time);
+    requestAnimationFrame(loop);
+  }
+  if(reduceMotion){
+    renderCloud(0);
+    setInterval(function(){ renderCloud(performance.now()); }, 1200);
+  } else {
+    requestAnimationFrame(loop);
+  }
+})();
+</script>
+
+</body></html>
