@@ -38,3 +38,16 @@ security/audit.log
 # build_tensorrt_engine.py, benchmark_*.py) -- built/measured artifacts,
 # GPU-specific in the .engine case, never source
 security/optimized/
+
+# colcon build output (Member 4) -- generated, not source
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# CARLA simulator itself (Member 4) -- ~20GB extracted Windows build, never
+# commit this. *.zip above already covers the installer archive; this
+# covers the unpacked binaries once extracted.
+CARLA_0.9.15/
+
+# Reference decks from past SIH winners (downloaded, not project code)
+SIH_Winning_PPTs/
