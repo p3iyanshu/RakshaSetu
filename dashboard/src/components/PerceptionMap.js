@@ -705,15 +705,17 @@ function drawPerceptionEntities(ctx, egoBaseX, egoBaseY, scale, objects, selecte
     }
 
     if (obj.class === 'pothole') {
-      // Flat technical dashed ellipses for road anomaly
+      // ─── POTHOLE ICON: Warning triangle + crater rings ───
       ctx.save();
       const rad = (obj.radius || 2.0) * scale;
 
+      // Crater fill
       ctx.fillStyle = 'rgba(168, 85, 247, 0.15)';
       ctx.beginPath();
       ctx.ellipse(ox, oy, rad * 1.3, rad * 0.9, 0, 0, Math.PI * 2);
       ctx.fill();
 
+      // Outer dashed ring
       ctx.strokeStyle = isSelected ? '#ffffff' : '#c084fc';
       ctx.lineWidth = 1.2;
       ctx.setLineDash([5, 3]);
@@ -721,6 +723,7 @@ function drawPerceptionEntities(ctx, egoBaseX, egoBaseY, scale, objects, selecte
       ctx.ellipse(ox, oy, rad * 1.3, rad * 0.9, 0, 0, Math.PI * 2);
       ctx.stroke();
 
+      // Inner dashed ring
       ctx.strokeStyle = 'rgba(192, 132, 252, 0.6)';
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
@@ -728,107 +731,213 @@ function drawPerceptionEntities(ctx, egoBaseX, egoBaseY, scale, objects, selecte
       ctx.ellipse(ox, oy, rad * 0.8, rad * 0.55, 0, 0, Math.PI * 2);
       ctx.stroke();
 
+      // Warning triangle icon in center
+      ctx.setLineDash([]);
+      const triSize = Math.min(rad * 0.6, 10);
+      ctx.beginPath();
+      ctx.moveTo(ox, oy - triSize);
+      ctx.lineTo(ox - triSize * 0.9, oy + triSize * 0.6);
+      ctx.lineTo(ox + triSize * 0.9, oy + triSize * 0.6);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(192, 132, 252, 0.7)';
+      ctx.fill();
+      ctx.strokeStyle = '#e879f9';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Exclamation mark inside triangle
+      ctx.fillStyle = '#1a0a2e';
+      ctx.fillRect(ox - 0.8, oy - triSize * 0.55, 1.6, triSize * 0.6);
+      ctx.beginPath();
+      ctx.arc(ox, oy + triSize * 0.25, 1, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.restore();
     } else if (obj.class === 'dynamic_vehicle') {
-      // Flat 2D Top-Down Vehicle Marker (Technical Desaturated HUD Vector)
+      // ─── CAR ICON: Top-down vehicle with windshield + wheels ───
       ctx.save();
       ctx.translate(ox, oy);
 
       const vW = (obj.bbox?.w || 1.9) * scale;
       const vL = (obj.bbox?.l || 4.4) * scale;
 
-      // Flat Desaturated Amber Chassis
-      ctx.fillStyle = '#b45309'; // Desaturated technical amber/yellow
+      // Wheels (4 small dark rectangles)
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-vW / 2 - 2.5, -vL * 0.28, 2.5, vL * 0.18);
+      ctx.fillRect(vW / 2, -vL * 0.28, 2.5, vL * 0.18);
+      ctx.fillRect(-vW / 2 - 2.5, vL * 0.12, 2.5, vL * 0.18);
+      ctx.fillRect(vW / 2, vL * 0.12, 2.5, vL * 0.18);
+
+      // Car body (rounded rect)
+      ctx.fillStyle = '#b45309';
       ctx.strokeStyle = isSelected ? '#ffffff' : '#f59e0b';
       ctx.lineWidth = 1;
-      ctx.fillRect(-vW / 2, -vL / 2, vW, vL);
-      ctx.strokeRect(-vW / 2, -vL / 2, vW, vL);
+      ctx.beginPath();
+      const bRad = 3;
+      ctx.moveTo(-vW / 2 + bRad, -vL / 2);
+      ctx.lineTo(vW / 2 - bRad, -vL / 2);
+      ctx.quadraticCurveTo(vW / 2, -vL / 2, vW / 2, -vL / 2 + bRad);
+      ctx.lineTo(vW / 2, vL / 2 - bRad);
+      ctx.quadraticCurveTo(vW / 2, vL / 2, vW / 2 - bRad, vL / 2);
+      ctx.lineTo(-vW / 2 + bRad, vL / 2);
+      ctx.quadraticCurveTo(-vW / 2, vL / 2, -vW / 2, vL / 2 - bRad);
+      ctx.lineTo(-vW / 2, -vL / 2 + bRad);
+      ctx.quadraticCurveTo(-vW / 2, -vL / 2, -vW / 2 + bRad, -vL / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-      // Cabin / Roof cutout
+      // Windshield (front window)
       ctx.fillStyle = '#0a101d';
-      ctx.fillRect(-vW * 0.35, -vL * 0.2, vW * 0.7, vL * 0.45);
+      ctx.fillRect(-vW * 0.35, -vL * 0.32, vW * 0.7, vL * 0.2);
 
-      // Bounding Corner Brackets (Technical 1px HUD markers)
+      // Rear window
+      ctx.fillRect(-vW * 0.35, vL * 0.18, vW * 0.7, vL * 0.14);
+
+      // Headlights (white)
+      ctx.fillStyle = '#fef9c3';
+      ctx.fillRect(-vW * 0.38, -vL / 2, 3, 2);
+      ctx.fillRect(vW * 0.38 - 3, -vL / 2, 3, 2);
+
+      // Taillights (red)
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(-vW * 0.38, vL / 2 - 2, 3, 2);
+      ctx.fillRect(vW * 0.38 - 3, vL / 2 - 2, 3, 2);
+
+      // Forward direction arrow
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, -vL * 0.22);
+      ctx.lineTo(0, -vL * 0.38);
+      ctx.lineTo(-2, -vL * 0.33);
+      ctx.moveTo(0, -vL * 0.38);
+      ctx.lineTo(2, -vL * 0.33);
+      ctx.stroke();
+
+      // Bounding Corner Brackets
       ctx.strokeStyle = isSelected ? '#00f2fe' : '#fbbf24';
       ctx.lineWidth = 1;
       drawBoundingCorners(ctx, -vW * 0.65, -vL * 0.6, vW * 1.3, vL * 1.2, 4);
 
       ctx.restore();
-    } else if (obj.class === 'dynamic_human') {
-      // Flat 2D Static Human Marker (Desaturated Orange Dot with Directional Chevron)
+    } else if (obj.class === 'dynamic_human' || obj.class === 'dynamic_pedestrian') {
+      // ─── HUMAN ICON: Small walking-figure silhouette ───
       ctx.save();
       ctx.translate(ox, oy);
 
-      // Flat orange circle marker
+      const hColor = isSelected ? '#ffffff' : '#f97316';
       ctx.fillStyle = '#ea580c';
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#f97316';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = hColor;
+
+      // Head
       ctx.beginPath();
-      ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+      ctx.arc(0, -6.5, 2.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Technical 1px corner markers
-      ctx.strokeStyle = isSelected ? '#00f2fe' : 'rgba(249, 115, 22, 0.7)';
+      // Torso
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(0, -4);
+      ctx.lineTo(0, 3);
+      ctx.stroke();
+
+      // Arms (walking stance)
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(-3.5, 1);
+      ctx.lineTo(0, -1.8);
+      ctx.lineTo(3.5, -0.5);
+      ctx.stroke();
+
+      // Legs (walking stride)
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-3, 8.5);
+      ctx.lineTo(0, 3);
+      ctx.lineTo(3, 8.5);
+      ctx.stroke();
+
+      // Compact technical corner markers
+      ctx.strokeStyle = isSelected ? '#00f2fe' : 'rgba(249, 115, 22, 0.6)';
       ctx.lineWidth = 1;
-      drawBoundingCorners(ctx, -7, -7, 14, 14, 3);
+      drawBoundingCorners(ctx, -5.5, -10, 11, 20, 2.5);
 
       ctx.restore();
-    } else if (obj.class === 'static_pole') {
-      // Flat 2D Static Pole Marker (Flat Salmon/Red Dot with 1px Outer Ring)
+    } else if (obj.class === 'static_pole' || obj.class === 'static_obstacle_pole') {
+      // ─── POLE: Reference's simple small dot/tag marker (not a full icon) ───
       ctx.save();
+      ctx.translate(ox, oy);
+
+      // Subtle outer ring
+      ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(239, 68, 68, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, 6.5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Small solid center dot
       ctx.fillStyle = '#ef4444';
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#f87171';
-      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(ox, oy, 4, 0, Math.PI * 2);
+      ctx.arc(0, 0, 3.2, 0, Math.PI * 2);
       ctx.fill();
-      ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 2]);
-      ctx.beginPath();
-      ctx.arc(ox, oy, 8, 0, Math.PI * 2);
-      ctx.stroke();
       ctx.restore();
-    } else if (obj.class === 'static_tree') {
-      // Flat 2D Static Tree Marker (Green canopy circle over a short brown trunk)
+    } else if (obj.class === 'static_tree' || obj.class === 'static_obstacle_tree' || obj.class === 'tree') {
+      // ─── TREE ICON: Small compact canopy + trunk silhouette ───
       ctx.save();
-      ctx.fillStyle = '#5c3a21';
-      ctx.fillRect(ox - 1, oy + 3, 2, 6);
+      ctx.translate(ox, oy);
 
-      ctx.fillStyle = '#15803d';
+      // Trunk (small dark base)
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(-1.2, 3, 2.4, 3.5);
+
+      // Compact layered canopy silhouette
+      ctx.fillStyle = '#16a34a';
       ctx.strokeStyle = isSelected ? '#ffffff' : '#00e676';
       ctx.lineWidth = 1;
+
+      // Bottom tier
       ctx.beginPath();
-      ctx.arc(ox, oy, 6, 0, Math.PI * 2);
+      ctx.moveTo(0, -3.5);
+      ctx.lineTo(-6.5, 3);
+      ctx.lineTo(6.5, 3);
+      ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(0, 230, 118, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 2]);
+      // Top tier
       ctx.beginPath();
-      ctx.arc(ox, oy, 10, 0, Math.PI * 2);
+      ctx.moveTo(0, -9.5);
+      ctx.lineTo(-4.5, -3);
+      ctx.lineTo(4.5, -3);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
+
+      // Compact technical corner brackets (no circular detection ring)
+      ctx.strokeStyle = isSelected ? '#00f2fe' : 'rgba(0, 230, 118, 0.6)';
+      ctx.lineWidth = 1;
+      drawBoundingCorners(ctx, -7.5, -11, 15, 18.5, 2.5);
+
       ctx.restore();
-    } else if (obj.class === 'static_wall') {
-      // Flat Technical Wall Segment Marker (short red bar, perpendicular to the road)
+    } else if (obj.class === 'static_wall' || obj.class === 'static_obstacle_wall') {
+      // ─── WALL: Simple line marker (tag box handled by HTML overlay) ───
       ctx.save();
       ctx.strokeStyle = isSelected ? '#ffffff' : '#ef4444';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.moveTo(ox - 9, oy);
-      ctx.lineTo(ox + 9, oy);
+      ctx.moveTo(ox - 8, oy);
+      ctx.lineTo(ox + 8, oy);
       ctx.stroke();
 
       ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
-      ctx.moveTo(ox - 13, oy);
-      ctx.lineTo(ox + 13, oy);
+      ctx.moveTo(ox - 12, oy);
+      ctx.lineTo(ox + 12, oy);
       ctx.stroke();
       ctx.restore();
     } else if (obj.class === 'curb') {
@@ -967,7 +1076,7 @@ function updateOverlayCallouts(overlayLayer, egoBaseX, egoBaseY, scale, objects,
     let offsetX = 18;
     let offsetY = -34;
 
-    if (obj.class === 'dynamic_human') {
+    if (obj.class === 'dynamic_human' || obj.class === 'dynamic_pedestrian') {
       borderClass = 'border-orange text-orange';
       headerColor = '#f97316';
       offsetX = 16;
@@ -977,12 +1086,12 @@ function updateOverlayCallouts(overlayLayer, egoBaseX, egoBaseY, scale, objects,
       headerColor = '#c084fc';
       offsetX = -88;
       offsetY = -38;
-    } else if (obj.class === 'static_pole') {
+    } else if (obj.class === 'static_pole' || obj.class === 'static_obstacle_pole') {
       borderClass = 'border-red text-red';
       headerColor = '#ef4444';
       offsetX = 18;
       offsetY = -24;
-    } else if (obj.class === 'static_tree') {
+    } else if (obj.class === 'static_tree' || obj.class === 'static_obstacle_tree' || obj.class === 'tree') {
       borderClass = 'border-green text-green';
       headerColor = '#00e676';
       offsetX = 18;
@@ -990,12 +1099,12 @@ function updateOverlayCallouts(overlayLayer, egoBaseX, egoBaseY, scale, objects,
     } else if (obj.class === 'curb') {
       borderClass = 'border-cyan text-cyan';
       headerColor = '#00f2fe';
-    } else if (obj.class === 'static_wall') {
+    } else if (obj.class === 'static_wall' || obj.class === 'static_obstacle_wall') {
       borderClass = 'border-red text-red';
       headerColor = '#ef4444';
     }
 
-    if (obj.name === 'WALL' || obj.class === 'static_wall') {
+    if (obj.name === 'WALL' || obj.class === 'static_wall' || obj.class === 'static_obstacle_wall') {
       return `
         <div class="map-tag wall-tag ${borderClass} ${isSelected ? 'tag-selected' : ''}" 
              style="left: ${ox}px; top: ${oy}px;" 

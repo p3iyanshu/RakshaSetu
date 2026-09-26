@@ -3,17 +3,17 @@
  * High-FPS Continuous Simulation Engine using Continuous World Odometry Projection.
  */
 
-import { WORLD_MODEL } from './lib/worldModel.js';
-import { CONFIG, onConfigChange } from './lib/config.js';
-import { createHeader } from './components/Header.js';
-import { createSceneInfo } from './components/SceneInfo.js';
-import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js';
-import { createSemanticLegend } from './components/SemanticLegend.js';
-import { createPerceptionMap } from './components/PerceptionMap.js';
-import { createEventsPanel } from './components/EventsPanel.js';
-import { createSelectedObject } from './components/SelectedObject.js';
-import { createElevationPanel } from './components/ElevationPanel.js';
-import { createMetricsBar } from './components/MetricsBar.js';
+import { WORLD_MODEL } from './lib/worldModel.js?v=6';
+import { CONFIG, onConfigChange } from './lib/config.js?v=6';
+import { createHeader } from './components/Header.js?v=6';
+import { createSceneInfo } from './components/SceneInfo.js?v=6';
+import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=6';
+import { createSemanticLegend } from './components/SemanticLegend.js?v=6';
+import { createPerceptionMap } from './components/PerceptionMap.js?v=6';
+import { createEventsPanel } from './components/EventsPanel.js?v=6';
+import { createSelectedObject } from './components/SelectedObject.js?v=6';
+import { createElevationPanel } from './components/ElevationPanel.js?v=6';
+import { createMetricsBar } from './components/MetricsBar.js?v=6';
 
 class DashboardApp {
   constructor() {

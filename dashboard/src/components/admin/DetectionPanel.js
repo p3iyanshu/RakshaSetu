@@ -1,16 +1,17 @@
 /**
- * Admin Console — Detection Panel (default main-screen view)
- * Basic vehicle information, the live LiDAR point-cloud feed (raw
- * classified data points, not the main dashboard's filled road/vehicle
- * graphics), and a detection log driven off the actual frame data.
+ * Admin Console — Detection Panel
+ * Basic vehicle information, interactive Grid Comparison (Adaptive vs. Uniform),
+ * the live LiDAR point-cloud feed with live grid mode switching, and a detection log.
  */
 
-import { createLidarFeedPanel } from './LidarFeedPanel.js';
+import { createLidarFeedPanel } from './LidarFeedPanel.js?v=5';
+import { createGridComparisonPanel } from './GridComparisonPanel.js?v=5';
 
 export function createDetectionPanel(container) {
   container.innerHTML = `
     <div class="admin-detection-grid">
       <div class="admin-detection-left">
+        <!-- 1. Basic Vehicle Information -->
         <div class="rs-card admin-basic-info-card">
           <div class="card-header">
             <h2 class="card-title">BASIC INFORMATION</h2>
@@ -18,6 +19,10 @@ export function createDetectionPanel(container) {
           <div class="card-body" id="admin-basic-info-body"></div>
         </div>
 
+        <!-- 2. Grid Comparison Panel (Adaptive vs. Uniform) -->
+        <div id="admin-grid-comparison-mount"></div>
+
+        <!-- 3. Detection Log -->
         <div class="rs-card admin-log-card">
           <div class="card-header">
             <h2 class="card-title">DETECTION LOG</h2>
@@ -26,6 +31,7 @@ export function createDetectionPanel(container) {
         </div>
       </div>
 
+      <!-- Live LiDAR Feed -->
       <div class="admin-map-card" id="admin-lidar-feed-mount"></div>
     </div>
   `;
@@ -33,6 +39,8 @@ export function createDetectionPanel(container) {
   const basicInfoElem = container.querySelector('#admin-basic-info-body');
   const logElem = container.querySelector('#admin-detection-log');
   const lidarFeedMount = container.querySelector('#admin-lidar-feed-mount');
+  const gridCompMount = container.querySelector('#admin-grid-comparison-mount');
+
   const lidarFeed = createLidarFeedPanel(lidarFeedMount);
 
   let previousTrackIds = new Set();
@@ -52,6 +60,15 @@ export function createDetectionPanel(container) {
       )
       .join('');
   }
+
+  // Connect Grid Comparison to the Live LiDAR feed
+  const gridComparison = createGridComparisonPanel(gridCompMount, (mode) => {
+    lidarFeed.setGridMode(mode);
+    pushEvent(
+      `Grid switched to ${mode.toUpperCase()} mode (${mode === 'uniform' ? '1.2M cells · Laggy 8 FPS · 74ms' : '444K cells · Smooth 42 FPS · 24ms'})`,
+      mode === 'uniform' ? '#ef4444' : '#00f2fe'
+    );
+  });
 
   return {
     update(frame, vehicle) {
@@ -99,6 +116,7 @@ export function createDetectionPanel(container) {
         </div>
       `;
 
+      gridComparison.update(frame);
       lidarFeed.update(frame);
 
       const currentIds = new Set(frame.objects.map((o) => String(o.track_id)));

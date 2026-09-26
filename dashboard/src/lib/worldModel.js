@@ -9,6 +9,14 @@
 
 import { CONFIG } from './config.js';
 
+// A retired track must never re-enter a frame, even if a future scenario
+// fixture accidentally adds it back to one of the object collections.
+export const RETIRED_TRACK_IDS = new Set(['27']);
+
+export function isRetiredObject(object) {
+  return RETIRED_TRACK_IDS.has(String(object?.track_id ?? object?.id ?? ''));
+}
+
 export class WorldModel {
   constructor() {
     this.totalLength = 320.0; // 320 meters track
@@ -47,12 +55,8 @@ export class WorldModel {
       // Human #23: Frozen on right sidewalk near corner (x=+5.2m, velocity 0.0 m/s)
       { track_id: '23', name: 'HUMAN #23', class: 'dynamic_human', ui_class: 'Dynamic Human', stationS: 212.0, lateralOffset: 5.2, confidence: 0.85, is_dynamic: false },
       // Corner Wall Tag (x=-10.8m)
-      { track_id: 'wall_turn', name: 'WALL', class: 'static_wall', ui_class: 'Static Wall', stationS: 238.0, lateralOffset: -10.8, confidence: 0.98, is_dynamic: false },
-      // Tree #25 on Right Sidewalk near the corner (x=+6.5m)
-      { track_id: '25', name: 'TREE #25', class: 'static_tree', ui_class: 'Static Tree', stationS: 225.0, lateralOffset: 6.5, confidence: 0.93, is_dynamic: false },
-      // Tree #27 on Left Sidewalk during the dynamic-turn stretch (x=-8.0m)
-      { track_id: '27', name: 'TREE #27', class: 'static_tree', ui_class: 'Static Tree', stationS: 275.0, lateralOffset: -8.0, confidence: 0.91, is_dynamic: false }
-    ];
+      { track_id: 'wall_turn', name: 'WALL', class: 'static_wall', ui_class: 'Static Wall', stationS: 238.0, lateralOffset: -10.8, confidence: 0.98, is_dynamic: false }
+    ].filter((object) => !isRetiredObject(object));
 
     // Dynamic Traffic (ONLY VEHICLES MOVE)
     this.dynamicVehicles = [
@@ -212,6 +216,10 @@ export class WorldModel {
 
     // Static Objects & Static Humans (FIX 4: 0.0 m/s, Stationary on sides of road)
     this.staticObjects.forEach(obj => {
+      // Keep the retirement rule at the emission boundary as well as the
+      // fixture boundary, so Tree #27 cannot reappear after a data change.
+      if (isRetiredObject(obj)) return;
+
       // Relative forward distance along the track
       let deltaS = obj.stationS - loopS;
       if (deltaS < -this.totalLength / 2) deltaS += this.totalLength;
@@ -242,6 +250,8 @@ export class WorldModel {
 
     // Dynamic Vehicles (Moving)
     activeVehicles.forEach(veh => {
+      if (isRetiredObject(veh)) return;
+
       const [vx, vy] = toRoadRelativeCoords(veh.worldPos[0], veh.worldPos[1], road.x, road.y, roadRad);
       const dist = Math.hypot(vx - this.currentLateralBias, vy);
 
@@ -291,7 +301,8 @@ export class WorldModel {
         mode: 'SIMULATION (CARLA)',
         status: 'ONLINE'
       },
-      objects: visibleObjects,
+      // Final defensive gate: no source path may emit the retired Tree #27.
+      objects: visibleObjects.filter((object) => !isRetiredObject(object)),
       elevation: {
         selected_cell_height_m: selHeight,
         local_terrain_height_m: terrHeight
