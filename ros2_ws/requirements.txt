@@ -1,0 +1,24 @@
+# Python deps for the *wrapped* Members 1-3 modules this ROS 2 package
+# imports directly via sys.path (see rakshasetu/repo_integration.py) --
+# NOT ROS 2 itself (rclpy/std_msgs come from your ROS 2 Humble install,
+# sourced via `source /opt/ros/humble/setup.bash`, not pip).
+#
+# Matches .github/workflows/contract-tests.yml exactly, since these are the
+# same modules that workflow tests.
+#
+# Install into whatever Python `ros2 run` actually uses (see
+# team_tasks/04_systems_integration_ros2.md's "Python environment
+# conflicts" pitfall -- ROS 2's system Python and a separate venv are not
+# automatically the same interpreter):
+#
+#   pip install -r ros2_ws/requirements.txt
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# torch is listed separately (as CI does) since the CPU wheel needs its own
+# index URL; segmentation_node.py falls back to models/placeholder.py (no
+# torch needed) if torch or the trained checkpoint isn't available, so the
+# pipeline still runs without it -- just not with the real trained model.
+numpy
+scipy
+scikit-learn
+open3d
