@@ -1,1060 +1,588 @@
 /**
  * PerceptionMap Component
- * High-DPI authentic 2.5D LiDAR Perception Renderer for RakshaSetu (SIH PS 26053 · DRDO).
+ * 2.5D perspective LiDAR perception view for RakshaSetu (SIH PS 26053 · DRDO).
  *
- * Implements:
- * 1. Dynamic Ego Vehicle Steering Yaw & Lateral Lane Motion (Car physically maneuvers across the road).
- * 2. Realistic LiDAR voxel textures, foveated point returns, 2.5D building meshes, and depth shading.
- * 3. Collision-free trajectory tracking with live object selection and tooltips.
+ * Layers (bottom -> top):
+ *   1. WebGL scene   - terrain heightfield with concentric contour rings,
+ *                      4-lane carriageway, foveated drivable grid, 3D objects
+ *   2. 2D overlay    - planned path, velocity vectors, selection brackets,
+ *                      range-ring labels, callout leader lines
+ *   3. HTML          - object callouts, road/terrain HUD, minimap, view controls
  */
 
+import { createSceneRenderer } from '../render/sceneRenderer.js';
+import { projectPoint } from '../render/glUtils.js';
 import { SEMANTIC_COLORS } from '../lib/colors.js';
+import {
+  TERRAIN, CENTERLINE, ALTITUDE_DATUM_M, terrainHeight
+} from '../lib/roadNetwork.js';
+
+const CLASS_COLOR = {
+  dynamic_vehicle: SEMANTIC_COLORS.dynamic_vehicle,
+  dynamic_human: SEMANTIC_COLORS.dynamic_human,
+  static_pole: SEMANTIC_COLORS.static_pole,
+  static_wall: SEMANTIC_COLORS.static_wall,
+  static_tree: SEMANTIC_COLORS.static_tree,
+  pothole: SEMANTIC_COLORS.pothole,
+  curb: SEMANTIC_COLORS.curb,
+  unclassified: '#94a3b8'
+};
+const CARD_CLASSES = new Set(['dynamic_vehicle', 'dynamic_human', 'pothole', 'unclassified']);
+const RING_RADII = [10, 30, 60, 120];
 
 export function createPerceptionMap(container, onSelectObject) {
   container.innerHTML = `
     <div class="map-viewport-container" id="map-viewport">
-      <canvas id="perception-canvas" class="perception-canvas"></canvas>
-      <div id="map-overlay-layer" class="map-overlay-layer"></div>
-      
-      <!-- Interactive Hover Tooltip -->
-      <div id="map-hover-tooltip" class="map-hover-tooltip" style="display: none;"></div>
+      <canvas class="perception-gl"></canvas>
+      <canvas class="perception-overlay"></canvas>
+      <div class="map-overlay-layer"></div>
+      <div class="map-hover-tooltip" style="display: none;"></div>
 
-      <!-- Compass and Scale Ruler (Bottom-Left Corner) -->
-      <div class="map-hud-bottom-left">
-        <div class="compass-widget">
-          <div class="compass-cross">
+      <div class="map-hud map-hud-top-left">
+        <div class="hud-title">
+          <span class="hud-live-dot"></span>LIVE 2.5D SCENE
+          <span class="hud-mode" data-ref="mode-label">PERSPECTIVE</span>
+        </div>
+        <div class="hud-grid">
+          <span>Curve</span><b data-ref="curve">—</b>
+          <span>Grade</span><b data-ref="grade">—</b>
+          <span>Lane</span><b data-ref="lane">—</b>
+          <span>Altitude</span><b data-ref="alt">—</b>
+        </div>
+      </div>
+
+      <div class="map-hud map-hud-top-right">
+        <div class="minimap-head">
+          <span>ROUTE OVERVIEW</span><span class="minimap-n">N ▲</span>
+        </div>
+        <canvas class="minimap-canvas" width="200" height="170"></canvas>
+      </div>
+
+      <div class="map-hud map-hud-bottom-left">
+        <div class="compass-widget" title="Map is heading-up; needle points north">
+          <div class="compass-rose" data-ref="rose">
             <span class="compass-n">N</span>
-            <span class="compass-w">W</span>
             <span class="compass-e">E</span>
             <span class="compass-s">S</span>
-            <div class="compass-needle" id="compass-needle"></div>
+            <span class="compass-w">W</span>
+            <div class="compass-needle"></div>
           </div>
         </div>
-        <div class="scale-ruler-widget">
-          <div class="scale-ruler-ticks">
-            <span>0</span>
-            <span>10</span>
-            <span>20</span>
-            <span>30 m</span>
+        <div class="view-controls">
+          <div class="seg-group" role="group" aria-label="Camera view">
+            <button class="seg-btn active" data-view="2.5D">2.5D</button>
+            <button class="seg-btn" data-view="TOP">TOP</button>
+            <button class="seg-btn" data-view="CHASE">CHASE</button>
           </div>
-          <div class="scale-ruler-bar">
-            <div class="scale-segment"></div>
-            <div class="scale-segment"></div>
-            <div class="scale-segment"></div>
+          <div class="seg-group" role="group" aria-label="Layers">
+            <button class="seg-btn active" data-layer="points" title="LiDAR point returns">PTS</button>
+            <button class="seg-btn active" data-layer="grid" title="Foveated drivable grid">GRID</button>
+            <button class="seg-btn" data-zoom="in" title="Zoom in">+</button>
+            <button class="seg-btn" data-zoom="out" title="Zoom out">−</button>
           </div>
         </div>
+      </div>
+
+      <div class="map-hud map-hud-bottom-right">
+        <div class="legend-row">
+          <span class="legend-label">TERRAIN</span>
+          <div class="hypso-bar"></div>
+        </div>
+        <div class="hypso-ticks">
+          <span>${Math.round(ALTITUDE_DATUM_M + TERRAIN.minZ)}</span>
+          <span>${Math.round(ALTITUDE_DATUM_M + (TERRAIN.minZ + TERRAIN.maxZ) / 2)}</span>
+          <span>${Math.round(ALTITUDE_DATUM_M + TERRAIN.maxZ)} m</span>
+        </div>
+        <div class="legend-notes">
+          <span><i class="ln ln-minor"></i>Contour 5 m</span>
+          <span><i class="ln ln-major"></i>Index 25 m</span>
+          <span><i class="ln ln-ring"></i>Range 10·30·60·120 m</span>
+        </div>
+      </div>
+
+      <div class="map-fallback" style="display:none">
+        WebGL2 is unavailable in this browser — the 2.5D scene needs a GPU-enabled browser.
       </div>
     </div>
   `;
 
-  const canvas = container.querySelector('#perception-canvas');
-  const overlayLayer = container.querySelector('#map-overlay-layer');
-  const tooltip = container.querySelector('#map-hover-tooltip');
-  const needle = container.querySelector('#compass-needle');
-  const ctx = canvas.getContext('2d');
+  const $ = (sel) => container.querySelector(sel);
+  const glCanvas = $('.perception-gl');
+  const overlay = $('.perception-overlay');
+  const octx = overlay.getContext('2d');
+  const calloutLayer = $('.map-overlay-layer');
+  const tooltip = $('.map-hover-tooltip');
+  const refs = {};
+  container.querySelectorAll('[data-ref]').forEach(el => { refs[el.dataset.ref] = el; });
+
+  let renderer = null;
+  try {
+    renderer = createSceneRenderer(glCanvas);
+  } catch (err) {
+    console.error('[PerceptionMap] WebGL init failed', err);
+  }
+  if (!renderer) $('.map-fallback').style.display = 'flex';
+
+  const minimap = createMinimap($('.minimap-canvas'));
 
   let currentFrame = null;
   let selectedObjectId = '04';
+  let cssW = 800, cssH = 600, dpr = 1;
+  let projected = [];   // [{obj, x, y, top}] from the last render, for picking
 
   function resize() {
     const rect = container.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(rect.width || container.clientWidth || 800, 200);
-    const h = Math.max(rect.height || container.clientHeight || 600, 200);
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    render();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cssW = Math.max(rect.width, 200);
+    cssH = Math.max(rect.height, 200);
+    for (const c of [glCanvas, overlay]) {
+      c.width = Math.round(cssW * dpr);
+      c.height = Math.round(cssH * dpr);
+      c.style.width = `${cssW}px`;
+      c.style.height = `${cssH}px`;
+    }
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  new ResizeObserver(resize).observe(container);
+  resize();
+
+  // ---- Controls ------------------------------------------------------------
+  container.querySelectorAll('[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!renderer) return;
+      renderer.setMode(btn.dataset.view);
+      container.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b === btn));
+      refs['mode-label'].textContent = { '2.5D': 'PERSPECTIVE', TOP: 'ORTHO TOP', CHASE: 'CHASE CAM' }[btn.dataset.view];
+    });
+  });
+  container.querySelectorAll('[data-layer]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!renderer) return;
+      const key = btn.dataset.layer === 'points' ? 'showPoints' : 'showGrid';
+      renderer.settings[key] = !renderer.settings[key];
+      btn.classList.toggle('active', renderer.settings[key]);
+    });
+  });
+  container.querySelectorAll('[data-zoom]').forEach(btn => {
+    btn.addEventListener('click', () => renderer && renderer.zoomBy(btn.dataset.zoom === 'in' ? 0.8 : 1.25));
+  });
+  overlay.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (renderer) renderer.zoomBy(e.deltaY > 0 ? 1.1 : 0.9);
+  }, { passive: false });
+
+  // Drag to orbit, double-click to reset
+  let drag = null;
+  overlay.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, moved: false }; });
+  window.addEventListener('pointermove', (e) => {
+    if (!drag || !renderer) return;
+    const dx = e.clientX - drag.x;
+    if (Math.abs(dx) > 2) drag.moved = true;
+    renderer.orbit(-dx * 0.006);
+    drag.x = e.clientX;
+  });
+  window.addEventListener('pointerup', () => { setTimeout(() => { drag = null; }, 0); });
+  overlay.addEventListener('dblclick', () => renderer && renderer.resetView());
+
+  // ---- Picking -------------------------------------------------------------
+  function pick(mx, my) {
+    let best = null, bestD = 30;
+    for (const p of projected) {
+      const d = Math.min(Math.hypot(mx - p.x, my - p.y), Math.hypot(mx - p.top.x, my - p.top.y));
+      if (d < bestD) { bestD = d; best = p.obj; }
+    }
+    return best;
   }
 
-  const resizeObserver = new ResizeObserver(() => {
-    resize();
+  overlay.addEventListener('click', (e) => {
+    if (drag && drag.moved) return;
+    const r = overlay.getBoundingClientRect();
+    const obj = pick(e.clientX - r.left, e.clientY - r.top);
+    if (obj) select(obj.track_id);
   });
-  resizeObserver.observe(container);
 
-  window.addEventListener('resize', resize);
-  requestAnimationFrame(resize);
-  setTimeout(resize, 50);
+  overlay.addEventListener('mousemove', (e) => {
+    const r = overlay.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const obj = pick(mx, my);
+    overlay.style.cursor = obj ? 'pointer' : (drag ? 'grabbing' : 'grab');
+    if (!obj) { tooltip.style.display = 'none'; return; }
+    tooltip.style.display = 'flex';
+    tooltip.style.left = `${mx + 14}px`;
+    tooltip.style.top = `${my - 10}px`;
+    tooltip.innerHTML = `
+      <span class="tooltip-title">${obj.name}</span>
+      <span class="tooltip-class">${obj.ui_class || obj.class}</span>
+      <span class="tooltip-dist font-mono">${obj.distance_m.toFixed(1)} m · ${obj.velocity_mps.toFixed(1)} m/s</span>`;
+  });
+  overlay.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
 
-  // Mouse Interaction
-  canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+  function select(id) {
+    selectedObjectId = String(id);
+    const obj = currentFrame?.objects.find(o => String(o.track_id) === selectedObjectId);
+    if (obj && onSelectObject) onSelectObject(obj);
+  }
 
-    const width = rect.width;
-    const height = rect.height;
-    const scale = Math.min(width / 52, height / 56);
-    const egoX = width * 0.50;
-    const egoY = height * 0.84;
+  // ---- Callouts (DOM nodes are reused across frames) ----------------------
+  const calloutNodes = new Map();
+  const labelSize = new Map();
+  calloutLayer.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-id]');
+    if (el) select(el.dataset.id);
+  });
 
-    if (!currentFrame || !currentFrame.objects) return;
-
-    for (const obj of currentFrame.objects) {
-      const ox = egoX + obj.position[0] * scale;
-      const oy = egoY - obj.position[1] * scale;
-      const hitRadius = obj.class === 'pothole' ? 35 : 28;
-
-      if (Math.hypot(clickX - ox, clickY - oy) < hitRadius) {
-        selectedObjectId = obj.track_id || obj.id;
-        if (onSelectObject) onSelectObject(obj);
-        render();
-        return;
+  function updateCallouts(items) {
+    const seen = new Set();
+    for (const it of items) {
+      const { obj, anchor, compact } = it;
+      const id = String(obj.track_id);
+      seen.add(id);
+      let el = calloutNodes.get(id);
+      const kind = compact ? 'tag' : 'card';
+      if (!el || el.dataset.kind !== kind) {
+        if (el) el.remove();
+        el = document.createElement('div');
+        el.dataset.id = id;
+        el.dataset.kind = kind;
+        el.className = compact ? 'map-tag' : 'map-callout-card';
+        calloutLayer.appendChild(el);
+        calloutNodes.set(id, el);
+      }
+      const color = CLASS_COLOR[obj.class] || '#94a3b8';
+      el.style.setProperty('--tag-color', color);
+      el.classList.toggle('is-selected', it.selected);
+      el.style.transform = `translate(${anchor.x.toFixed(1)}px, ${anchor.y.toFixed(1)}px)`;
+      const html = compact
+        ? `${obj.name}`
+        : `<div class="callout-header">${obj.name}</div>
+           <div class="callout-stats font-mono">
+             <span>${obj.distance_m.toFixed(1)} m</span>
+             <span>${obj.velocity_mps.toFixed(1)} m/s</span>
+             <span>${obj.confidence}%</span>
+           </div>`;
+      if (el._html !== html) {
+        el.innerHTML = html;
+        el._html = html;
+        labelSize.set(id + (compact ? 't' : 'c'), { w: el.offsetWidth, h: el.offsetHeight });
       }
     }
-  });
-
-  canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const width = rect.width;
-    const height = rect.height;
-    const scale = Math.min(width / 52, height / 56);
-    const egoX = width * 0.50;
-    const egoY = height * 0.84;
-
-    let matchedObj = null;
-    if (currentFrame && currentFrame.objects) {
-      for (const obj of currentFrame.objects) {
-        const ox = egoX + obj.position[0] * scale;
-        const oy = egoY - obj.position[1] * scale;
-        const hitRadius = obj.class === 'pothole' ? 35 : 28;
-
-        if (Math.hypot(mouseX - ox, mouseY - oy) < hitRadius) {
-          matchedObj = obj;
-          break;
-        }
-      }
+    for (const [id, el] of calloutNodes) {
+      if (!seen.has(id)) { el.remove(); calloutNodes.delete(id); }
     }
+  }
 
-    if (matchedObj) {
-      canvas.style.cursor = 'pointer';
-      tooltip.style.display = 'block';
-      tooltip.style.left = `${mouseX + 12}px`;
-      tooltip.style.top = `${mouseY - 24}px`;
-      tooltip.innerHTML = `
-        <span class="tooltip-title">${matchedObj.name}</span>
-        <span class="tooltip-class">${matchedObj.ui_class || matchedObj.class}</span>
-        <span class="tooltip-dist font-mono">${(matchedObj.distance_m || 0).toFixed(1)}m · ${(matchedObj.velocity_mps || 0).toFixed(1)}m/s</span>
-      `;
-    } else {
-      canvas.style.cursor = 'default';
-      tooltip.style.display = 'none';
-    }
-  });
-
-  canvas.addEventListener('mouseleave', () => {
-    tooltip.style.display = 'none';
-  });
-
-  /**
-   * Main High-DPI Render Loop (60 FPS)
-   */
+  // ---- Per-frame render -----------------------------------------------------
   function render() {
-    if (!currentFrame) return;
+    if (!currentFrame || !renderer) return;
+    const frame = currentFrame;
+    const cam = renderer.render(frame, selectedObjectId);
+    const M = cam.viewProj;
+    const P = (x, y, z) => projectPoint(M, x, y, z, cssW, cssH);
 
-    const dpr = window.devicePixelRatio || 1;
-    const width = canvas.width / dpr;
-    const height = canvas.height / dpr;
+    octx.clearRect(0, 0, cssW, cssH);
+    const ego = frame.ego;
 
-    const scale = Math.min(width / 52, height / 56);
-    const egoBaseX = width * 0.50;
-    const egoBaseY = height * 0.84;
-
-    const distS = currentFrame.distanceTraveled || 0.0;
-    const headingDeg = currentFrame.scene.heading_deg || 0.0;
-    const lateralOffset = currentFrame.lateralOffset || 0.0;
-    const steeringYawDeg = currentFrame.steeringYawDeg || 0.0;
-
-    // Actual screen coordinate of Ego Vehicle (with subtle dynamic lateral lane displacement)
-    const egoScreenX = egoBaseX + lateralOffset * scale;
-    const egoScreenY = egoBaseY;
-
-    // Update compass needle rotation
-    if (needle) {
-      needle.style.transform = `rotate(${-headingDeg}deg)`;
+    // Planned trajectory ribbon
+    if (frame.plannedPath) {
+      octx.save();
+      octx.lineCap = 'round';
+      octx.lineJoin = 'round';
+      const pts = frame.plannedPath.map(p => P(p[0], p[1], p[2])).filter(Boolean);
+      if (pts.length > 1) {
+        const grad = octx.createLinearGradient(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y);
+        grad.addColorStop(0, 'rgba(0, 242, 254, 0.85)');
+        grad.addColorStop(1, 'rgba(0, 242, 254, 0.0)');
+        octx.strokeStyle = grad;
+        octx.lineWidth = 2.2;
+        octx.setLineDash([7, 5]);
+        octx.beginPath();
+        pts.forEach((p, i) => (i ? octx.lineTo(p.x, p.y) : octx.moveTo(p.x, p.y)));
+        octx.stroke();
+      }
+      octx.restore();
     }
 
-    // 1. Background Clear
-    ctx.fillStyle = '#03060c';
-    ctx.fillRect(0, 0, width, height);
+    // Range ring labels, placed on the ring along the camera's right vector
+    octx.save();
+    octx.font = '600 10px "JetBrains Mono", monospace';
+    octx.textAlign = 'left';
+    octx.textBaseline = 'middle';
+    for (const r of RING_RADII) {
+      const a = cam.yaw + cam.orbitYaw - 0.55;
+      const lx = ego.x + Math.cos(a) * r, ly = ego.y + Math.sin(a) * r;
+      const p = P(lx, ly, terrainHeight(lx, ly) + 0.3);
+      if (!p || p.x < 0 || p.x > cssW - 40 || p.y < 0 || p.y > cssH) continue;
+      const label = `${r} m`;
+      const w = octx.measureText(label).width + 8;
+      octx.fillStyle = 'rgba(3, 8, 14, 0.72)';
+      octx.fillRect(p.x - 2, p.y - 7, w, 14);
+      octx.fillStyle = 'rgba(0, 242, 254, 0.9)';
+      octx.fillText(label, p.x + 2, p.y);
+    }
+    octx.restore();
 
-    // 2. Continuous Coordinate Grid Matrix (Scrolls with vehicle motion)
-    drawScrollingCoordinateGrid(ctx, width, height, egoBaseX, egoBaseY, scale, distS);
+    // Objects: vectors, selection brackets, callout anchors
+    projected = [];
+    const labelItems = [];
+    for (const obj of frame.objects) {
+      const w = obj.world;
+      if (!w) continue;
+      const h = obj.bbox?.h ?? 1;
+      const base = P(w.x, w.y, w.z + Math.min(h, 1.2) * 0.5);
+      const top = P(w.x, w.y, w.z + h + 0.4);
+      if (!base || !top) continue;
+      if (base.x < -60 || base.x > cssW + 60 || base.y < -60 || base.y > cssH + 60) continue;
+      projected.push({ obj, x: base.x, y: base.y, top });
+      const selected = String(obj.track_id) === String(selectedObjectId);
+      const color = CLASS_COLOR[obj.class] || '#94a3b8';
 
-    // 3. Realistic 2.5D Building Blocks & Red Wall Obstacles (Edge-to-edge)
-    drawRealisticBuildingsAndWalls(ctx, width, height, egoBaseX, egoBaseY, scale, distS, headingDeg);
+      // Velocity vector (1.5 s horizon) for moving objects
+      if (obj.is_dynamic && obj.velocity_mps > 0.2) {
+        const len = obj.velocity_mps * 1.5;
+        const ex = w.x + Math.cos(w.yaw) * len, ey = w.y + Math.sin(w.yaw) * len;
+        const a = P(w.x, w.y, w.z + 0.1), b = P(ex, ey, w.z + 0.1);
+        if (a && b) drawArrow(octx, a, b, color);
+      }
 
-    // 4. Authentic Drivable Foveated Road Grid (Discrete 5cm/15cm/30cm/50cm LiDAR voxels)
-    drawAuthenticDrivableGrid(ctx, egoBaseX, egoBaseY, scale, distS, headingDeg);
+      if (selected) drawSelectionBox(octx, obj, P);
 
-    // 5. Road Center Lane Markings
-    drawRealisticLaneMarkings(ctx, egoBaseX, egoBaseY, scale, distS, headingDeg);
+      const important = CARD_CLASSES.has(obj.class);
+      if (selected || (important && obj.distance_m < 95) || (!important && obj.distance_m < 55)) {
+        labelItems.push({ obj, top, selected, compact: !selected && !important });
+      }
+    }
 
-    // 6. Detected Perception Entities (Vehicles, Humans, Potholes, Poles, Curbs)
-    drawPerceptionEntities(ctx, egoBaseX, egoBaseY, scale, currentFrame.objects, selectedObjectId);
-
-    // 7. Dynamic Ego Vehicle (Renders at egoScreenX with real steering yaw!)
-    drawDynamicEgoVehicle(ctx, egoScreenX, egoScreenY, scale, steeringYawDeg);
-
-    // 8. Update HTML Overlays
-    updateOverlayCallouts(overlayLayer, egoBaseX, egoBaseY, scale, currentFrame.objects, selectedObjectId, (objId) => {
-      selectedObjectId = objId;
-      const targetObj = currentFrame.objects.find(o => o.track_id == objId || o.id == objId);
-      if (onSelectObject && targetObj) onSelectObject(targetObj);
+    // Declutter: nearest full cards first, cap the count
+    labelItems.sort((a, b) => (b.selected - a.selected) || (a.obj.distance_m - b.obj.distance_m));
+    let cards = 0;
+    // HUD panels are obstacles for label placement
+    const vp = container.getBoundingClientRect();
+    const placed = [...container.querySelectorAll('.map-hud')].map(el => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left - vp.left - 4, y: r.top - vp.top - 4, w: r.width + 8, h: r.height + 8 };
     });
+    const finalItems = [];
+    for (const it of labelItems) {
+      if (!it.compact && !it.selected && cards >= 6) it.compact = true;
+      const size = labelSize.get(String(it.obj.track_id) + (it.compact ? 't' : 'c'));
+      const wEst = size ? size.w : (it.compact ? 70 : 130), hEst = size ? size.h : (it.compact ? 18 : 36);
+      let ax = it.top.x + 12, ay = it.top.y - hEst - 10;
+      // Nudge upward if colliding with an already placed label
+      ax = Math.min(Math.max(ax, 4), cssW - wEst - 4);
+      ay = Math.min(Math.max(ay, 4), cssH - hEst - 4);
+      for (let tries = 0; tries < 6; tries++) {
+        const hit = placed.find(r => ax < r.x + r.w && ax + wEst > r.x && ay < r.y + r.h && ay + hEst > r.y);
+        if (!hit) break;
+        // Move above the obstacle, or below it when there is no room above
+        ay = hit.y - hEst - 4 >= 4 ? hit.y - hEst - 4 : hit.y + hit.h + 4;
+      }
+      const stillHit = placed.some(r => ax < r.x + r.w && ax + wEst > r.x && ay < r.y + r.h && ay + hEst > r.y);
+      if (stillHit && !it.selected) continue;   // no free slot: drop the label, keep the 3D object
+      placed.push({ x: ax, y: ay, w: wEst, h: hEst });
+      if (!it.compact) cards++;
+      // Leader line from object top to the label corner
+      octx.strokeStyle = CLASS_COLOR[it.obj.class] || '#94a3b8';
+      octx.globalAlpha = it.selected ? 0.95 : 0.55;
+      octx.lineWidth = 1;
+      octx.beginPath();
+      octx.moveTo(it.top.x, it.top.y);
+      octx.lineTo(ax, ay + hEst);
+      octx.stroke();
+      octx.globalAlpha = 1;
+      finalItems.push({ ...it, anchor: { x: ax, y: ay } });
+    }
+    updateCallouts(finalItems);
+
+    // HUD readouts
+    if (frame.road) {
+      const rd = frame.road;
+      refs.curve.textContent = rd.turn === 'Straight' ? 'Straight' : `R ${rd.radius_m} m ${rd.turn.toUpperCase()}`;
+      refs.grade.textContent = `${rd.grade_pct > 0 ? '+' : ''}${rd.grade_pct.toFixed(1)} %`;
+      refs.lane.textContent = rd.lane;
+      refs.alt.textContent = `${frame.scene.altitude_m} m MSL`;
+    }
+    const yawDeg = (cam.yaw + cam.orbitYaw) * 180 / Math.PI;
+    refs.rose.style.transform = `rotate(${yawDeg - 90}deg)`;
+    minimap.draw(frame, cam);
   }
 
   return {
     update(frame, selectedId) {
       currentFrame = frame;
-      if (selectedId !== undefined) selectedObjectId = selectedId;
+      if (selectedId !== undefined) selectedObjectId = String(selectedId);
       render();
     },
-    destroy() {
-      window.removeEventListener('resize', resize);
-    }
+    destroy() {}
   };
 }
 
-/**
- * 2. Background Grid Matrix
- */
-function drawScrollingCoordinateGrid(ctx, width, height, egoBaseX, egoBaseY, scale, distS) {
+// ---------------------------------------------------------------------------
+// Overlay helpers
+// ---------------------------------------------------------------------------
+function drawArrow(ctx, a, b, color) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 6) return;
+  const ux = dx / len, uy = dy / len;
   ctx.save();
-  ctx.strokeStyle = '#081220';
-  ctx.lineWidth = 1;
-
-  const step = 5 * scale;
-  const offsetY = (distS * scale) % step;
-
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
-  for (let x = 0; x < width; x += step) {
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
-  }
-  for (let y = offsetY; y < height; y += step) {
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-  }
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x - ux * 5, b.y - uy * 5);
   ctx.stroke();
-
-  // Subtle crosshair tick marks at 10m intervals
-  ctx.fillStyle = '#0c1e30';
-  for (let x = 0; x < width; x += 10 * scale) {
-    for (let y = offsetY; y < height; y += 10 * scale) {
-      ctx.fillRect(x - 2, y, 5, 1);
-      ctx.fillRect(x, y - 2, 1, 5);
-    }
-  }
-
-  ctx.restore();
-}
-
-/**
- * 3. Authentic 2.5D Architectural Urban Buildings & Sidewalks (High-fidelity Perception Environment)
- */
-function drawRealisticBuildingsAndWalls(ctx, width, height, egoBaseX, egoBaseY, scale, distS, headingDeg) {
-  ctx.save();
-  const roadHalfW = 6.8 * scale;
-  const sidewalkW = 3.8 * scale;
-  const headingRad = (headingDeg * Math.PI) / 180;
-  const turnFactor = Math.sin(headingRad);
-
-  const leftSidewalkX = egoBaseX - roadHalfW - sidewalkW;
-  const leftRoadEdgeX = egoBaseX - roadHalfW;
-  const rightRoadEdgeX = egoBaseX + roadHalfW;
-  const rightSidewalkX = egoBaseX + roadHalfW + sidewalkW;
-
-  // 1. Sidewalk Pavement Strips (Clean Concrete Curb Flanks)
-  ctx.fillStyle = '#08101d';
-  ctx.fillRect(0, 0, leftRoadEdgeX, height);
-  ctx.fillRect(rightRoadEdgeX, 0, width - rightRoadEdgeX, height);
-
-  // Sidewalk pavement tile joints (scrolls with vehicle motion)
-  ctx.strokeStyle = '#101c2e';
-  ctx.lineWidth = 1;
-  const tileStep = 3.2 * scale;
-  const tileScroll = (distS * scale) % tileStep;
-
   ctx.beginPath();
-  for (let y = -tileStep + tileScroll; y < height + tileStep; y += tileStep) {
-    const curveOffset = (egoBaseY - y) * turnFactor * 0.35;
-    ctx.moveTo(leftSidewalkX + curveOffset, y);
-    ctx.lineTo(leftRoadEdgeX + curveOffset, y);
-    ctx.moveTo(rightRoadEdgeX + curveOffset, y);
-    ctx.lineTo(rightSidewalkX + curveOffset, y);
-  }
-  ctx.stroke();
-
-  // Curb Boundary Line (1px crisp edge)
-  ctx.strokeStyle = '#1a2f47';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let y = 0; y < height; y += 40) {
-    const curveOffset = (egoBaseY - y) * turnFactor * 0.35;
-    ctx.moveTo(leftRoadEdgeX + curveOffset, y); ctx.lineTo(leftRoadEdgeX + curveOffset, y + 40);
-    ctx.moveTo(rightRoadEdgeX + curveOffset, y); ctx.lineTo(rightRoadEdgeX + curveOffset, y + 40);
-  }
-  ctx.stroke();
-
-  // 2. Realistic 2.5D Architectural City Buildings (No generic grids — real architectural volume!)
-  const totalCycleM = 150.0;
-  const scrollInCycle = ((distS % totalCycleM) + totalCycleM) % totalCycleM;
-
-  // Varied Architectural Profiles
-  const buildingProfiles = [
-    {
-      startY: 0.0,
-      len: 28.0,
-      depthM: 22.0,
-      heightM: 18.5,
-      type: 'tower', // Office tower with stepped roof & rooftop HVAC
-      name: 'TOWER 01',
-      hvac: [{ xRel: 0.3, yRel: 0.3, wM: 4.5, lM: 5.5 }]
-    },
-    {
-      startY: 34.0,
-      len: 34.0,
-      depthM: 26.0,
-      heightM: 24.0,
-      type: 'commercial', // Large complex with helipad & dual plant rooms
-      name: 'COMMERCIAL HUB',
-      hvac: [
-        { xRel: 0.2, yRel: 0.2, wM: 5.0, lM: 6.0 },
-        { xRel: 0.6, yRel: 0.7, wM: 4.0, lM: 4.5 }
-      ],
-      helipad: { xRel: 0.5, yRel: 0.45, rM: 3.5 }
-    },
-    {
-      startY: 74.0,
-      len: 22.0,
-      depthM: 18.0,
-      heightM: 12.0,
-      type: 'stepped', // Stepped residential block
-      name: 'RESIDENCE BLK',
-      hvac: [{ xRel: 0.5, yRel: 0.4, wM: 3.5, lM: 4.0 }]
-    },
-    {
-      startY: 102.0,
-      len: 40.0,
-      depthM: 24.0,
-      heightM: 16.0,
-      type: 'tech', // Tech facility with solar array
-      name: 'TECH COMPLEX',
-      solar: true,
-      hvac: [{ xRel: 0.7, yRel: 0.2, wM: 4.5, lM: 7.0 }]
-    }
-  ];
-
-  buildingProfiles.forEach((bldg, idx) => {
-    let relY_M = bldg.startY - scrollInCycle;
-    while (relY_M < -45.0) relY_M += totalCycleM;
-    while (relY_M > 105.0) relY_M -= totalCycleM;
-
-    const screenTopY = egoBaseY - (relY_M + bldg.len) * scale;
-    const screenBottomY = egoBaseY - relY_M * scale;
-    const bldgHeightPx = screenBottomY - screenTopY;
-
-    if (screenBottomY > -50 && screenTopY < height + 50) {
-      const midY = (screenTopY + screenBottomY) / 2;
-      const curveOffset = (egoBaseY - midY) * turnFactor * 0.35;
-
-      // ==========================================
-      // A. LEFT-SIDE 2.5D BUILDING
-      // ==========================================
-      const lFrontX = leftSidewalkX + curveOffset;
-      const lBackX = Math.max(0, lFrontX - bldg.depthM * scale);
-      const lWidth = lFrontX - lBackX;
-      const lExtrudePx = Math.min(14, bldg.heightM * 0.6 * scale);
-
-      // 1. Building Shadow & Base Wall
-      ctx.fillStyle = '#040810';
-      ctx.fillRect(lBackX, screenTopY, lWidth, bldgHeightPx);
-
-      // 2. Extruded Front Facade Wall (facing road)
-      ctx.fillStyle = '#0a1526';
-      ctx.fillRect(lFrontX - 3.5 * scale, screenTopY, 3.5 * scale, bldgHeightPx);
-
-      // Vertical architectural structural columns/mullions on facade
-      ctx.strokeStyle = '#162842';
-      ctx.lineWidth = 1;
-      const colSpacing = 3.5 * scale;
-      ctx.beginPath();
-      for (let cy = screenTopY + colSpacing; cy < screenBottomY; cy += colSpacing) {
-        ctx.moveTo(lFrontX - 3.5 * scale, cy);
-        ctx.lineTo(lFrontX, cy);
-      }
-      ctx.stroke();
-
-      // 3. Main Rooftop Slab (Volumetric Polygon with Parapet)
-      ctx.fillStyle = '#0d1a2d';
-      ctx.fillRect(lBackX + 2, screenTopY + 2, lWidth - 2, bldgHeightPx - 4);
-
-      // Parapet Border Outline
-      ctx.strokeStyle = '#1e3a5f';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(lBackX + 2, screenTopY + 2, lWidth - 2, bldgHeightPx - 4);
-
-      // 4. Rooftop Mechanical / HVAC Penthouse Structures
-      if (bldg.hvac) {
-        bldg.hvac.forEach(h => {
-          const hx = lFrontX - (h.xRel * lWidth);
-          const hy = screenTopY + (h.yRel * bldgHeightPx);
-          const hw = h.wM * scale * 0.7;
-          const hl = h.lM * scale * 0.7;
-
-          // Equipment body
-          ctx.fillStyle = '#14253d';
-          ctx.strokeStyle = '#274770';
-          ctx.lineWidth = 1;
-          ctx.fillRect(hx - hw, hy, hw, hl);
-          ctx.strokeRect(hx - hw, hy, hw, hl);
-
-          // Chiller fan grills
-          ctx.fillStyle = '#0b1626';
-          ctx.beginPath();
-          ctx.arc(hx - hw * 0.5, hy + hl * 0.5, Math.min(hw, hl) * 0.35, 0, Math.PI * 2);
-          ctx.fill();
-        });
-      }
-
-      // Helipad if configured
-      if (bldg.helipad) {
-        const hpx = lFrontX - (bldg.helipad.xRel * lWidth);
-        const hpy = screenTopY + (bldg.helipad.yRel * bldgHeightPx);
-        const hpr = bldg.helipad.rM * scale * 0.7;
-
-        ctx.strokeStyle = 'rgba(0, 242, 254, 0.4)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.arc(hpx, hpy, hpr, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.font = 'bold 9px "JetBrains Mono", monospace';
-        ctx.fillStyle = 'rgba(0, 242, 254, 0.5)';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('H', hpx, hpy);
-      }
-
-      // 5. Perimeter LiDAR Hit Points (Discrete sensor returns at building corners)
-      ctx.fillStyle = '#00f2fe';
-      ctx.fillRect(lFrontX - 2, screenTopY + 1, 2, 2);
-      ctx.fillRect(lFrontX - 2, screenBottomY - 3, 2, 2);
-      ctx.fillRect(lBackX + 2, screenTopY + 1, 2, 2);
-      ctx.fillRect(lBackX + 2, screenBottomY - 3, 2, 2);
-
-      // Corner Registration Brackets
-      ctx.strokeStyle = 'rgba(0, 242, 254, 0.35)';
-      drawBoundingCorners(ctx, lBackX, screenTopY, lWidth, bldgHeightPx, 5);
-
-      // Building Label Tag
-      ctx.font = '8.5px "JetBrains Mono", monospace';
-      ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(`${bldg.name} · H:${bldg.heightM.toFixed(1)}m`, Math.max(10, lFrontX - 110), screenTopY + 8);
-
-      // ==========================================
-      // B. RIGHT-SIDE 2.5D BUILDING
-      // ==========================================
-      const rFrontX = rightSidewalkX + curveOffset;
-      const rBackX = Math.min(width, rFrontX + bldg.depthM * scale);
-      const rWidth = rBackX - rFrontX;
-
-      // 1. Building Shadow & Base Wall
-      ctx.fillStyle = '#040810';
-      ctx.fillRect(rFrontX, screenTopY, rWidth, bldgHeightPx);
-
-      // 2. Extruded Facade Wall
-      ctx.fillStyle = '#0a1526';
-      ctx.fillRect(rFrontX, screenTopY, 3.5 * scale, bldgHeightPx);
-
-      // Structural facade columns
-      ctx.strokeStyle = '#162842';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let cy = screenTopY + colSpacing; cy < screenBottomY; cy += colSpacing) {
-        ctx.moveTo(rFrontX, cy);
-        ctx.lineTo(rFrontX + 3.5 * scale, cy);
-      }
-      ctx.stroke();
-
-      // 3. Rooftop Slab
-      ctx.fillStyle = '#0d1a2d';
-      ctx.fillRect(rFrontX + 2, screenTopY + 2, rWidth - 2, bldgHeightPx - 4);
-
-      // Parapet Border Outline
-      ctx.strokeStyle = '#1e3a5f';
-      ctx.strokeRect(rFrontX + 2, screenTopY + 2, rWidth - 2, bldgHeightPx - 4);
-
-      // 4. Rooftop Mechanical Equipment
-      if (bldg.hvac) {
-        bldg.hvac.forEach(h => {
-          const hx = rFrontX + (h.xRel * rWidth);
-          const hy = screenTopY + (h.yRel * bldgHeightPx);
-          const hw = h.wM * scale * 0.7;
-          const hl = h.lM * scale * 0.7;
-
-          ctx.fillStyle = '#14253d';
-          ctx.strokeStyle = '#274770';
-          ctx.lineWidth = 1;
-          ctx.fillRect(hx, hy, hw, hl);
-          ctx.strokeRect(hx, hy, hw, hl);
-
-          ctx.fillStyle = '#0b1626';
-          ctx.beginPath();
-          ctx.arc(hx + hw * 0.5, hy + hl * 0.5, Math.min(hw, hl) * 0.35, 0, Math.PI * 2);
-          ctx.fill();
-        });
-      }
-
-      // Solar Panels on Tech Building
-      if (bldg.solar) {
-        const sx = rFrontX + 6 * scale;
-        const sy = screenTopY + 8 * scale;
-        const sw = 10 * scale;
-        const sl = 18 * scale;
-
-        ctx.fillStyle = '#0a1e36';
-        ctx.strokeStyle = '#1d4875';
-        ctx.lineWidth = 0.75;
-        ctx.fillRect(sx, sy, sw, sl);
-        ctx.strokeRect(sx, sy, sw, sl);
-
-        // Panel rows
-        ctx.beginPath();
-        for (let py = sy + 3 * scale; py < sy + sl; py += 3 * scale) {
-          ctx.moveTo(sx, py);
-          ctx.lineTo(sx + sw, py);
-        }
-        ctx.stroke();
-      }
-
-      // 5. Perimeter LiDAR Hit Points
-      ctx.fillStyle = '#00f2fe';
-      ctx.fillRect(rFrontX + 1, screenTopY + 1, 2, 2);
-      ctx.fillRect(rFrontX + 1, screenBottomY - 3, 2, 2);
-      ctx.fillRect(rBackX - 3, screenTopY + 1, 2, 2);
-      ctx.fillRect(rBackX - 3, screenBottomY - 3, 2, 2);
-
-      // Corner Brackets
-      ctx.strokeStyle = 'rgba(0, 242, 254, 0.35)';
-      drawBoundingCorners(ctx, rFrontX, screenTopY, rWidth, bldgHeightPx, 5);
-
-      // Building Label Tag
-      ctx.font = '8.5px "JetBrains Mono", monospace';
-      ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(`BLDG R${idx + 1} · H:${(bldg.heightM * 1.05).toFixed(1)}m`, rFrontX + 8, screenTopY + 8);
-    }
-  });
-
-  // 3. Red Barrier Voxels along Road Edges (Scrolling continuously!)
-  const cellSize = 1.9 * scale;
-  const scrollOffset = (distS * scale) % cellSize;
-
-  for (let y = -cellSize + scrollOffset; y < height + cellSize; y += cellSize) {
-    const curveOffset = (egoBaseY - y) * turnFactor * 0.35;
-
-    // Left Wall Barrier Point
-    const lx = leftRoadEdgeX - cellSize * 0.6 + curveOffset;
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
-    ctx.strokeStyle = '#ef4444';
-    ctx.fillRect(lx, y, cellSize - 1.5, cellSize - 1.5);
-    ctx.strokeRect(lx, y, cellSize - 1.5, cellSize - 1.5);
-
-    // Right Wall Barrier Point
-    const rx = rightRoadEdgeX - cellSize * 0.4 + curveOffset;
-    ctx.fillRect(rx, y, cellSize - 1.5, cellSize - 1.5);
-    ctx.strokeRect(rx, y, cellSize - 1.5, cellSize - 1.5);
-  }
-
-  ctx.restore();
-}
-
-/**
- * 4. Authentic Drivable Foveated Road Grid (Tactical Emerald Green LiDAR Voxels)
- */
-function drawAuthenticDrivableGrid(ctx, egoBaseX, egoBaseY, scale, distS, headingDeg) {
-  ctx.save();
-  const roadHalfW = 6.8 * scale;
-  const headingRad = (headingDeg * Math.PI) / 180;
-  const turnFactor = Math.sin(headingRad);
-
-  // Band 1: 0 - 10m (High Density 5cm resolution - fine-grained voxel matrix)
-  const c5 = 0.85 * scale;
-  const scroll5 = (distS * scale) % c5;
-  for (let r = 0; r <= 10.0 * scale; r += c5) {
-    const y = egoBaseY - r + scroll5;
-    const curveOffset = (egoBaseY - y) * turnFactor * 0.35;
-    const minX = egoBaseX - roadHalfW + curveOffset + 0.4 * scale;
-    const maxX = egoBaseX + roadHalfW + curveOffset - 0.4 * scale;
-
-    for (let x = minX; x <= maxX; x += c5) {
-      ctx.fillStyle = 'rgba(0, 230, 118, 0.42)';
-      ctx.strokeStyle = 'rgba(0, 230, 118, 0.95)';
-      ctx.lineWidth = 0.75;
-      ctx.fillRect(x, y, c5 - 1, c5 - 1);
-      ctx.strokeRect(x, y, c5 - 1, c5 - 1);
-
-      ctx.fillStyle = '#00ff88';
-      ctx.fillRect(x + c5 / 2 - 0.75, y + c5 / 2 - 0.75, 1.5, 1.5);
-    }
-  }
-
-  // Band 2: 10 - 30m (Medium Density 15cm resolution)
-  const c15 = 1.8 * scale;
-  const scroll15 = (distS * scale) % c15;
-  for (let r = 10.0 * scale; r <= 30.0 * scale; r += c15) {
-    const y = egoBaseY - r + scroll15;
-    const curveOffset = (egoBaseY - y) * turnFactor * 0.35;
-    const minX = egoBaseX - roadHalfW + curveOffset;
-    const maxX = egoBaseX + roadHalfW + curveOffset;
-
-    for (let x = minX; x <= maxX; x += c15) {
-      ctx.fillStyle = 'rgba(0, 230, 118, 0.32)';
-      ctx.strokeStyle = 'rgba(0, 230, 118, 0.85)';
-      ctx.lineWidth = 1;
-      ctx.fillRect(x, y, c15 - 1.5, c15 - 1.5);
-      ctx.strokeRect(x, y, c15 - 1.5, c15 - 1.5);
-
-      ctx.fillStyle = '#00e676';
-      ctx.fillRect(x + c15 / 2 - 1, y + c15 / 2 - 1, 2, 2);
-    }
-  }
-
-  // Band 3: 30 - 60m (Coarse Density 30cm / 50cm resolution)
-  const c30 = 3.6 * scale;
-  const scroll30 = (distS * scale) % c30;
-  for (let r = 30.0 * scale; r <= 55.0 * scale; r += c30) {
-    const y = egoBaseY - r + scroll30;
-    const curveOffset = (egoBaseY - y) * turnFactor * 0.35;
-    const minX = egoBaseX - roadHalfW + curveOffset;
-    const maxX = egoBaseX + roadHalfW + curveOffset;
-
-    for (let x = minX; x <= maxX; x += c30) {
-      ctx.fillStyle = 'rgba(0, 230, 118, 0.22)';
-      ctx.strokeStyle = 'rgba(0, 230, 118, 0.70)';
-      ctx.lineWidth = 1;
-      ctx.fillRect(x, y, c30 - 2, c30 - 2);
-      ctx.strokeRect(x, y, c30 - 2, c30 - 2);
-    }
-  }
-
-  ctx.restore();
-}
-
-/**
- * 5. Road Center Lane Markings
- */
-function drawRealisticLaneMarkings(ctx, egoBaseX, egoBaseY, scale, distS, headingDeg) {
-  ctx.save();
-  const headingRad = (headingDeg * Math.PI) / 180;
-  const turnFactor = Math.sin(headingRad);
-
-  const dashLen = 2.4 * scale;
-  const gapLen = 2.4 * scale;
-  const period = dashLen + gapLen;
-  const scrollOffset = (distS * scale) % period;
-
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-
-  for (let y = -period + scrollOffset; y < egoBaseY + 10 * scale; y += period) {
-    const curveOffset = (egoBaseY - y) * turnFactor * 0.35;
-    ctx.fillRect(egoBaseX - 1.2 + curveOffset, y, 2.4, dashLen);
-  }
-
-  ctx.restore();
-}
-
-/**
- * 6. Detected Perception Entities (Flat Technical HUD Shapes - No Game Juices)
- */
-function drawPerceptionEntities(ctx, egoBaseX, egoBaseY, scale, objects, selectedId) {
-  if (!objects || !objects.length) return;
-
-  // Render static objects first, then dynamic vehicles
-  const sortedObjects = [...objects].sort((a, b) => {
-    if (a.class === 'dynamic_vehicle' && b.class !== 'dynamic_vehicle') return 1;
-    if (a.class !== 'dynamic_vehicle' && b.class === 'dynamic_vehicle') return -1;
-    return 0;
-  });
-
-  sortedObjects.forEach(obj => {
-    const ox = egoBaseX + obj.position[0] * scale;
-    const oy = egoBaseY - obj.position[1] * scale;
-    const isSelected = String(obj.track_id) === String(selectedId) || String(obj.id) === String(selectedId);
-
-    // Selected object highlight ring (clean 1.5px technical ring)
-    if (isSelected) {
-      ctx.save();
-      ctx.strokeStyle = '#00f2fe';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.arc(ox, oy, 22, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    if (obj.class === 'pothole') {
-      // Flat technical dashed ellipses for road anomaly
-      ctx.save();
-      const rad = (obj.radius || 2.0) * scale;
-
-      ctx.fillStyle = 'rgba(168, 85, 247, 0.15)';
-      ctx.beginPath();
-      ctx.ellipse(ox, oy, rad * 1.3, rad * 0.9, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#c084fc';
-      ctx.lineWidth = 1.2;
-      ctx.setLineDash([5, 3]);
-      ctx.beginPath();
-      ctx.ellipse(ox, oy, rad * 1.3, rad * 0.9, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(192, 132, 252, 0.6)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      ctx.ellipse(ox, oy, rad * 0.8, rad * 0.55, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.restore();
-    } else if (obj.class === 'dynamic_vehicle') {
-      // Flat 2D Top-Down Vehicle Marker (Technical Desaturated HUD Vector)
-      ctx.save();
-      ctx.translate(ox, oy);
-
-      const vW = (obj.bbox?.w || 1.9) * scale;
-      const vL = (obj.bbox?.l || 4.4) * scale;
-
-      // Flat Desaturated Amber Chassis
-      ctx.fillStyle = '#b45309'; // Desaturated technical amber/yellow
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#f59e0b';
-      ctx.lineWidth = 1;
-      ctx.fillRect(-vW / 2, -vL / 2, vW, vL);
-      ctx.strokeRect(-vW / 2, -vL / 2, vW, vL);
-
-      // Cabin / Roof cutout
-      ctx.fillStyle = '#0a101d';
-      ctx.fillRect(-vW * 0.35, -vL * 0.2, vW * 0.7, vL * 0.45);
-
-      // Bounding Corner Brackets (Technical 1px HUD markers)
-      ctx.strokeStyle = isSelected ? '#00f2fe' : '#fbbf24';
-      ctx.lineWidth = 1;
-      drawBoundingCorners(ctx, -vW * 0.65, -vL * 0.6, vW * 1.3, vL * 1.2, 4);
-
-      ctx.restore();
-    } else if (obj.class === 'dynamic_human') {
-      // Flat 2D Static Human Marker (Desaturated Orange Dot with Directional Chevron)
-      ctx.save();
-      ctx.translate(ox, oy);
-
-      // Flat orange circle marker
-      ctx.fillStyle = '#ea580c';
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#f97316';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Technical 1px corner markers
-      ctx.strokeStyle = isSelected ? '#00f2fe' : 'rgba(249, 115, 22, 0.7)';
-      ctx.lineWidth = 1;
-      drawBoundingCorners(ctx, -7, -7, 14, 14, 3);
-
-      ctx.restore();
-    } else if (obj.class === 'static_pole') {
-      // Flat 2D Static Pole Marker (Flat Salmon/Red Dot with 1px Outer Ring)
-      ctx.save();
-      ctx.fillStyle = '#ef4444';
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#f87171';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(ox, oy, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 2]);
-      ctx.beginPath();
-      ctx.arc(ox, oy, 8, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    } else if (obj.class === 'static_tree') {
-      // Flat 2D Static Tree Marker (Green canopy circle over a short brown trunk)
-      ctx.save();
-      ctx.fillStyle = '#5c3a21';
-      ctx.fillRect(ox - 1, oy + 3, 2, 6);
-
-      ctx.fillStyle = '#15803d';
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#00e676';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(ox, oy, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(0, 230, 118, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 2]);
-      ctx.beginPath();
-      ctx.arc(ox, oy, 10, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    } else if (obj.class === 'static_wall') {
-      // Flat Technical Wall Segment Marker (short red bar, perpendicular to the road)
-      ctx.save();
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#ef4444';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(ox - 9, oy);
-      ctx.lineTo(ox + 9, oy);
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 2]);
-      ctx.beginPath();
-      ctx.moveTo(ox - 13, oy);
-      ctx.lineTo(ox + 13, oy);
-      ctx.stroke();
-      ctx.restore();
-    } else if (obj.class === 'curb') {
-      // Flat Cyan Point Marker
-      ctx.save();
-      ctx.fillStyle = '#00f2fe';
-      ctx.beginPath();
-      ctx.arc(ox, oy, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  });
-}
-
-/**
- * 7. Dynamic Ego Vehicle (ALWAYS TOPMOST, ALWAYS VISIBLE - Tactical Cyan/Sapphire Livery)
- */
-function drawDynamicEgoVehicle(ctx, egoX, egoY, scale, steeringYawDeg) {
-  ctx.save();
-  ctx.translate(egoX, egoY);
-
-  const yawRad = (steeringYawDeg * Math.PI) / 180;
-  ctx.rotate(yawRad);
-
-  const carW = 2.4 * scale;
-  const carL = 5.0 * scale;
-
-  // 1. Forward Sensor-Fan Lines (Subtle Technical LiDAR rays & arc projection)
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0, 242, 254, 0.4)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-
-  // Center ray
-  ctx.beginPath();
-  ctx.moveTo(0, -carL / 2);
-  ctx.lineTo(0, -carL / 2 - 24 * scale);
-  ctx.stroke();
-
-  // Left & Right Fan Rays (45-degree field)
-  ctx.beginPath();
-  ctx.moveTo(0, -carL / 2);
-  ctx.lineTo(-12 * scale, -carL / 2 - 20 * scale);
-  ctx.moveTo(0, -carL / 2);
-  ctx.lineTo(12 * scale, -carL / 2 - 20 * scale);
-  ctx.stroke();
-
-  // Forward Range Arc
-  ctx.strokeStyle = 'rgba(0, 242, 254, 0.28)';
-  ctx.beginPath();
-  ctx.arc(0, -carL / 2, 22 * scale, -Math.PI * 0.7, -Math.PI * 0.3);
-  ctx.stroke();
-  ctx.restore();
-
-  // 2. Ego Vehicle Chassis (Tactical Defense Sapphire & Cyan Perception Livery)
-  ctx.fillStyle = '#0f172a'; // Rear wheels (straight)
-  ctx.fillRect(-carW / 2 - 2.5, carL * 0.15, 2.5, carL * 0.22);
-  ctx.fillRect(carW / 2, carL * 0.15, 2.5, carL * 0.22);
-
-  // Steerable Front Wheels
-  ctx.save();
-  const frontWheelSteer = Math.max(-0.4, Math.min(0.4, yawRad * 1.5));
-  
-  // Front Left Wheel
-  ctx.save();
-  ctx.translate(-carW / 2 - 1.25, -carL * 0.24);
-  ctx.rotate(frontWheelSteer);
-  ctx.fillRect(-1.25, -carL * 0.11, 2.5, carL * 0.22);
-  ctx.restore();
-
-  // Front Right Wheel
-  ctx.save();
-  ctx.translate(carW / 2 + 1.25, -carL * 0.24);
-  ctx.rotate(frontWheelSteer);
-  ctx.fillRect(-1.25, -carL * 0.11, 2.5, carL * 0.22);
-  ctx.restore();
-  ctx.restore();
-
-  // Body Shell (Distinct Tactical Cobalt Sapphire #0369a1 / #0284c7)
-  ctx.fillStyle = '#0369a1'; // Deep tactical sapphire blue
-  ctx.strokeStyle = '#00f2fe'; // Crisp 1px bright cyan HUD border
-  ctx.lineWidth = 1.3;
-  roundRect(ctx, -carW / 2, -carL / 2, carW, carL, 3);
-  ctx.fill();
-  ctx.stroke();
-
-  // Dark Tinted Windshield & Rear Canopy
-  ctx.fillStyle = '#050c18';
-  ctx.fillRect(-carW * 0.36, -carL * 0.28, carW * 0.72, carL * 0.2);
-  ctx.fillRect(-carW * 0.36, carL * 0.22, carW * 0.72, carL * 0.14);
-
-  // Roof Structure
-  ctx.fillStyle = '#075985';
-  ctx.fillRect(-carW * 0.3, -carL * 0.04, carW * 0.6, carL * 0.24);
-
-  // Roof LiDAR Autonomous Perception Dome (Luminescent Cyan Sensor)
-  ctx.fillStyle = '#00f2fe';
-  ctx.fillRect(-carW * 0.16, -carL * 0.02, carW * 0.32, carL * 0.12);
-
-  // Headlights & Taillights
-  ctx.fillStyle = '#e0f2fe';
-  ctx.fillRect(-carW * 0.42, -carL / 2, 3, 1.8);
-  ctx.fillRect(carW * 0.42 - 3, -carL / 2, 3, 1.8);
-
-  ctx.fillStyle = '#ef4444';
-  ctx.fillRect(-carW * 0.42, carL / 2 - 1.8, 3, 1.8);
-  ctx.fillRect(carW * 0.42 - 3, carL / 2 - 1.8, 3, 1.8);
-
-  // Forward Direction Reticle Arrow
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, -carL * 0.38);
-  ctx.lineTo(0, -carL * 0.46);
-  ctx.lineTo(-2.5, -carL * 0.41);
-  ctx.moveTo(0, -carL * 0.46);
-  ctx.lineTo(2.5, -carL * 0.41);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-/**
- * 8. HTML Overlay Floating Callouts
- */
-function updateOverlayCallouts(overlayLayer, egoBaseX, egoBaseY, scale, objects, selectedId, onSelect) {
-  if (!objects) return;
-
-  overlayLayer.innerHTML = objects.map(obj => {
-    const ox = egoBaseX + obj.position[0] * scale;
-    const oy = egoBaseY - obj.position[1] * scale;
-    const isSelected = String(obj.track_id) === String(selectedId) || String(obj.id) === String(selectedId);
-
-    let borderClass = 'border-yellow text-yellow';
-    let headerColor = '#facc15';
-    let offsetX = 18;
-    let offsetY = -34;
-
-    if (obj.class === 'dynamic_human') {
-      borderClass = 'border-orange text-orange';
-      headerColor = '#f97316';
-      offsetX = 16;
-      offsetY = -30;
-    } else if (obj.class === 'pothole') {
-      borderClass = 'border-purple text-purple';
-      headerColor = '#c084fc';
-      offsetX = -88;
-      offsetY = -38;
-    } else if (obj.class === 'static_pole') {
-      borderClass = 'border-red text-red';
-      headerColor = '#ef4444';
-      offsetX = 18;
-      offsetY = -24;
-    } else if (obj.class === 'static_tree') {
-      borderClass = 'border-green text-green';
-      headerColor = '#00e676';
-      offsetX = 18;
-      offsetY = -26;
-    } else if (obj.class === 'curb') {
-      borderClass = 'border-cyan text-cyan';
-      headerColor = '#00f2fe';
-    } else if (obj.class === 'static_wall') {
-      borderClass = 'border-red text-red';
-      headerColor = '#ef4444';
-    }
-
-    if (obj.name === 'WALL' || obj.class === 'static_wall') {
-      return `
-        <div class="map-tag wall-tag ${borderClass} ${isSelected ? 'tag-selected' : ''}" 
-             style="left: ${ox}px; top: ${oy}px;" 
-             data-id="${obj.track_id || obj.id}">
-          WALL
-        </div>
-      `;
-    }
-
-    if (obj.name === 'CURB' || obj.class === 'curb') {
-      return `
-        <div class="map-tag curb-tag ${borderClass} ${isSelected ? 'tag-selected' : ''}" 
-             style="left: ${ox + 20}px; top: ${oy - 6}px;" 
-             data-id="${obj.track_id || obj.id}">
-          CURB
-        </div>
-      `;
-    }
-
-    return `
-      <div class="map-callout-card ${borderClass} ${isSelected ? 'callout-selected' : ''}" 
-           style="left: ${ox + offsetX}px; top: ${oy + offsetY}px;"
-           data-id="${obj.track_id || obj.id}">
-        <div class="callout-header" style="color: ${headerColor};">${obj.name}</div>
-        <div class="callout-stat font-mono">${(obj.distance_m || 0).toFixed(1)} m</div>
-        <div class="callout-stat font-mono">${(obj.velocity_mps || 0).toFixed(1)} m/s</div>
-        <div class="callout-stat font-mono">${obj.confidence || 90}%</div>
-      </div>
-    `;
-  }).join('');
-
-  overlayLayer.querySelectorAll('[data-id]').forEach(elem => {
-    elem.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = elem.getAttribute('data-id');
-      if (onSelect) onSelect(id);
-    });
-  });
-}
-
-function roundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.moveTo(b.x, b.y);
+  ctx.lineTo(b.x - ux * 7 - uy * 4, b.y - uy * 7 + ux * 4);
+  ctx.lineTo(b.x - ux * 7 + uy * 4, b.y - uy * 7 - ux * 4);
   ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
-function drawBoundingCorners(ctx, x, y, w, h, len) {
+/** Projected 3D bounding box with corner brackets for the selected object. */
+function drawSelectionBox(ctx, obj, P) {
+  const w = obj.world;
+  const b = obj.bbox || { l: 1, w: 1, h: 1 };
+  const l = obj.class === 'pothole' ? 2.8 : b.l + 0.4;
+  const wd = obj.class === 'pothole' ? 2.4 : b.w + 0.4;
+  const h = obj.class === 'pothole' ? 0.3 : b.h + 0.2;
+  const c = Math.cos(w.yaw), s = Math.sin(w.yaw);
+  const corners = [];
+  for (const [fx, fy] of [[l / 2, wd / 2], [l / 2, -wd / 2], [-l / 2, -wd / 2], [-l / 2, wd / 2]]) {
+    const x = w.x + c * fx - s * fy, y = w.y + s * fx + c * fy;
+    corners.push([x, y]);
+  }
+  const bottom = corners.map(([x, y]) => P(x, y, w.z + 0.05));
+  const top = corners.map(([x, y]) => P(x, y, w.z + h));
+  if (bottom.some(p => !p) || top.some(p => !p)) return;
+  ctx.save();
+  ctx.strokeStyle = '#00f2fe';
+  ctx.lineWidth = 1.4;
+  ctx.shadowColor = 'rgba(0, 242, 254, 0.8)';
+  ctx.shadowBlur = 6;
+  const poly = (pts) => {
+    ctx.beginPath();
+    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.stroke();
+  };
+  ctx.globalAlpha = 0.9;
+  poly(bottom);
+  poly(top);
+  ctx.globalAlpha = 0.6;
   ctx.beginPath();
-  ctx.moveTo(x + len, y); ctx.lineTo(x, y); ctx.lineTo(x + len, y);
-  ctx.moveTo(x + w - len, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + len);
-  ctx.moveTo(x + w, y + h - len); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - len, y + h);
-  ctx.moveTo(x + len, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - len);
+  for (let i = 0; i < 4; i++) { ctx.moveTo(bottom[i].x, bottom[i].y); ctx.lineTo(top[i].x, top[i].y); }
   ctx.stroke();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Minimap: north-up overview with terrain, contours, route and ego wedge
+// ---------------------------------------------------------------------------
+function createMinimap(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < CENTERLINE.count; i++) {
+    minX = Math.min(minX, CENTERLINE.xs[i]); maxX = Math.max(maxX, CENTERLINE.xs[i]);
+    minY = Math.min(minY, CENTERLINE.ys[i]); maxY = Math.max(maxY, CENTERLINE.ys[i]);
+  }
+  const pad = 70;
+  minX -= pad; maxX += pad; minY -= pad; maxY += pad;
+  const scale = Math.min(W / (maxX - minX), H / (maxY - minY));
+  const ox = (W - (maxX - minX) * scale) / 2, oy = (H - (maxY - minY) * scale) / 2;
+  const toPx = (x, y) => [ox + (x - minX) * scale, H - (oy + (y - minY) * scale)];
+
+  // Pre-render base layer
+  const base = document.createElement('canvas');
+  base.width = W; base.height = H;
+  const bctx = base.getContext('2d');
+  const img = bctx.createImageData(W, H);
+  const span = TERRAIN.maxZ - TERRAIN.minZ;
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const x = minX + (px - ox) / scale;
+      const y = minY + (H - py - oy) / scale;
+      const z = terrainHeight(x, y);
+      const zx = terrainHeight(x + 4, y) - terrainHeight(x - 4, y);
+      const zy = terrainHeight(x, y + 4) - terrainHeight(x, y - 4);
+      const shade = Math.max(0.35, Math.min(1.35, 0.9 + (-zx + zy) * 0.06));
+      const t = (z - TERRAIN.minZ) / span;
+      const c = [18 + t * 70, 30 + t * 55, 26 + t * 45];
+      const contour = Math.abs(((z / 10) % 1 + 1) % 1 - 0.5) > 0.44 ? 1 : 0;
+      const o = (py * W + px) * 4;
+      img.data[o] = Math.min(255, c[0] * shade + contour * 22);
+      img.data[o + 1] = Math.min(255, c[1] * shade + contour * 45);
+      img.data[o + 2] = Math.min(255, c[2] * shade + contour * 48);
+      img.data[o + 3] = 255;
+    }
+  }
+  bctx.putImageData(img, 0, 0);
+  bctx.lineJoin = 'round';
+  const route = () => {
+    bctx.beginPath();
+    for (let i = 0; i <= CENTERLINE.count; i += 3) {
+      const k = i % CENTERLINE.count;
+      const [px, py] = toPx(CENTERLINE.xs[k], CENTERLINE.ys[k]);
+      i ? bctx.lineTo(px, py) : bctx.moveTo(px, py);
+    }
+    bctx.closePath();
+  };
+  bctx.strokeStyle = 'rgba(8, 12, 18, 0.9)';
+  bctx.lineWidth = 5;
+  route(); bctx.stroke();
+  bctx.strokeStyle = '#8b98a8';
+  bctx.lineWidth = 2.4;
+  route(); bctx.stroke();
+
+  return {
+    draw(frame, cam) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(base, 0, 0);
+      const e = frame.ego;
+      const [ex, ey] = toPx(e.x, e.y);
+      const yaw = cam.yaw + cam.orbitYaw;
+      // View wedge
+      ctx.save();
+      ctx.translate(ex, ey);
+      ctx.rotate(-yaw);
+      ctx.fillStyle = 'rgba(0, 242, 254, 0.16)';
+      ctx.strokeStyle = 'rgba(0, 242, 254, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(160 * scale, -85 * scale);
+      ctx.lineTo(160 * scale, 85 * scale);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      // Tracked objects
+      for (const o of frame.objects) {
+        if (!o.world) continue;
+        const [px, py] = toPx(o.world.x, o.world.y);
+        ctx.fillStyle = CLASS_COLOR[o.class] || '#94a3b8';
+        ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+      }
+      // Ego marker
+      ctx.save();
+      ctx.translate(ex, ey);
+      ctx.rotate(-e.yaw);
+      ctx.fillStyle = '#00f2fe';
+      ctx.strokeStyle = '#03101a';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(7, 0);
+      ctx.lineTo(-5, 4.5);
+      ctx.lineTo(-2.5, 0);
+      ctx.lineTo(-5, -4.5);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+      ctx.restore();
+    }
+  };
 }

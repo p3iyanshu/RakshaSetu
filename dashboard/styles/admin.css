@@ -177,7 +177,7 @@
 
 .admin-detection-grid {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 330px 1fr;
   gap: 8px;
   height: 100%;
   min-height: 0;
@@ -188,6 +188,8 @@
   flex-direction: column;
   gap: 8px;
   min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .admin-basic-info-card {
@@ -372,6 +374,237 @@
 .admin-severity-badge.severity-severe {
   color: #ef4444;
   background: rgba(239, 68, 68, 0.12);
+}
+
+/* --- Grid Comparison Component --- */
+.admin-grid-comp-card {
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.grid-comp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.badge-compute-save {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 2.5px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+}
+
+.badge-compute-save.overload {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.grid-comp-body {
+  padding: 12px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grid-live-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toggle-feed-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.toggle-btn-group {
+  display: flex;
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.grid-toggle-btn {
+  font-family: var(--font-main);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  background: var(--bg-card-inner);
+  border: none;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.grid-toggle-btn:hover:not(.active) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.grid-toggle-btn.active[data-mode="adaptive"] {
+  background: #00f2fe;
+  color: #03060c;
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.35);
+}
+
+.grid-toggle-btn.active[data-mode="uniform"] {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+}
+
+.grid-compare-visuals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.grid-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 6px 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.grid-col.active-col {
+  background: rgba(0, 242, 254, 0.04);
+  border-color: rgba(0, 242, 254, 0.25);
+}
+
+.grid-col.uniform-col.active-col {
+  background: rgba(239, 68, 68, 0.04);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.grid-visual-box {
+  width: 112px;
+  height: 112px;
+  aspect-ratio: 1/1;
+  border-radius: 4px;
+  background: #060e12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.uniform-visual-box {
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.08);
+}
+
+.adaptive-visual-box {
+  border: none;
+  background: transparent;
+}
+
+.grid-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.grid-col-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+}
+
+.caption-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.caption-cells {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.caption-cells strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.caption-sub {
+  font-size: 9px;
+  color: var(--text-secondary);
+  opacity: 0.75;
+  margin-top: 1px;
+}
+
+/* Lidar Feed HUD additions */
+.lidar-feed-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lidar-mode-badge {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.lidar-mode-badge.adaptive {
+  color: #00f2fe;
+  background: rgba(0, 242, 254, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+}
+
+.lidar-mode-badge.uniform {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.lidar-feed-overlay-tag {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  background: rgba(3, 6, 12, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  pointer-events: none;
 }
 
 @media (max-width: 900px) {

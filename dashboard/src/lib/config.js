@@ -21,10 +21,10 @@ const DEFAULTS = {
     { range: '60 - 120 m', cellSize: '50 cm' }
   ],
   scenarioSpeedsKmh: {
-    'Urban Drive': 22.1,
-    'Pothole Detection': 20.4,
-    'Left Turn': 16.9,
-    'Dynamic Turn': 18.5
+    'Highway Cruise': 42.0,
+    'Pothole Detection': 34.0,
+    'Hairpin Turn': 30.0,
+    'Oncoming Traffic': 38.0
   },
   elevationByClass: {
     pothole: { selected: -0.22, terrain: -0.18 },

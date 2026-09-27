@@ -12,7 +12,7 @@ export function createSceneInfo(container) {
       <div class="card-body">
         <div class="info-row">
           <span class="info-label">Scenario</span>
-          <span class="info-value" id="scene-scenario">Urban Drive</span>
+          <span class="info-value" id="scene-scenario">Highway Cruise</span>
         </div>
         <div class="info-row">
           <span class="info-label">Time Elapsed</span>
@@ -30,6 +30,10 @@ export function createSceneInfo(container) {
           <span class="info-label">Position (x, y)</span>
           <span class="info-value font-mono" id="scene-position">(16.8, 128.1) m</span>
         </div>
+        <div class="info-row">
+          <span class="info-label">Altitude / Grade</span>
+          <span class="info-value font-mono" id="scene-altitude">3470 m · +0.0 %</span>
+        </div>
       </div>
     </div>
   `;
@@ -39,11 +43,12 @@ export function createSceneInfo(container) {
   const speedElem = container.querySelector('#scene-speed');
   const headingElem = container.querySelector('#scene-heading');
   const posElem = container.querySelector('#scene-position');
+  const altElem = container.querySelector('#scene-altitude');
 
   return {
     update(sceneData) {
       if (!sceneData) return;
-      if (scenarioElem) scenarioElem.textContent = sceneData.scenario || 'Urban Drive';
+      if (scenarioElem) scenarioElem.textContent = sceneData.scenario || 'Highway Cruise';
       if (elapsedElem) elapsedElem.textContent = sceneData.elapsed || '00:00.0';
       if (speedElem) speedElem.textContent = `${(sceneData.speed_kmh || 0).toFixed(1)} km/h`;
       if (headingElem) {
@@ -53,6 +58,10 @@ export function createSceneInfo(container) {
       }
       if (posElem && sceneData.position) {
         posElem.textContent = `(${sceneData.position[0].toFixed(1)}, ${sceneData.position[1].toFixed(1)}) m`;
+      }
+      if (altElem && sceneData.altitude_m !== undefined) {
+        const g = sceneData.grade_pct || 0;
+        altElem.textContent = `${sceneData.altitude_m} m · ${g >= 0 ? '+' : ''}${g.toFixed(1)} %`;
       }
     }
   };
