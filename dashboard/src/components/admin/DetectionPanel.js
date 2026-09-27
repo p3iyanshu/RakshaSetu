@@ -4,8 +4,8 @@
  * the live LiDAR point-cloud feed with live grid mode switching, and a detection log.
  */
 
-import { createLidarFeedPanel } from './LidarFeedPanel.js?v=5';
-import { createGridComparisonPanel } from './GridComparisonPanel.js?v=5';
+import { createLidarFeedPanel } from './LidarFeedPanel.js?v=8';
+import { createGridComparisonPanel } from './GridComparisonPanel.js?v=8';
 
 export function createDetectionPanel(container) {
   container.innerHTML = `

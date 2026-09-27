@@ -3,17 +3,17 @@
  * High-FPS Continuous Simulation Engine using Continuous World Odometry Projection.
  */
 
-import { WORLD_MODEL } from './lib/worldModel.js?v=6';
-import { CONFIG, onConfigChange } from './lib/config.js?v=6';
-import { createHeader } from './components/Header.js?v=6';
-import { createSceneInfo } from './components/SceneInfo.js?v=6';
-import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=6';
-import { createSemanticLegend } from './components/SemanticLegend.js?v=6';
-import { createPerceptionMap } from './components/PerceptionMap.js?v=6';
-import { createEventsPanel } from './components/EventsPanel.js?v=6';
-import { createSelectedObject } from './components/SelectedObject.js?v=6';
-import { createElevationPanel } from './components/ElevationPanel.js?v=6';
-import { createMetricsBar } from './components/MetricsBar.js?v=6';
+import { WORLD_MODEL } from './lib/worldModel.js';
+import { CONFIG, onConfigChange } from './lib/config.js';
+import { createHeader } from './components/Header.js?v=8';
+import { createSceneInfo } from './components/SceneInfo.js?v=8';
+import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=8';
+import { createSemanticLegend } from './components/SemanticLegend.js?v=8';
+import { createPerceptionMap } from './components/PerceptionMap.js?v=9';
+import { createEventsPanel } from './components/EventsPanel.js?v=8';
+import { createSelectedObject } from './components/SelectedObject.js?v=8';
+import { createElevationPanel } from './components/ElevationPanel.js?v=8';
+import { createMetricsBar } from './components/MetricsBar.js?v=8';
 
 class DashboardApp {
   constructor() {
@@ -25,11 +25,10 @@ class DashboardApp {
     this.lastEventS = -100;
 
     this.eventsHistory = [
-      { timestamp: '17:54:18', type: 'vehicle', text: 'Vehicle #04 detected', color: '#00e676' },
-      { timestamp: '17:54:19', type: 'pole', text: 'Pole #11 detected', color: '#a3e635' },
-      { timestamp: '17:54:20', type: 'drivable', text: 'Drivable area updated', color: '#00e676' },
-      { timestamp: '17:54:20', type: 'human', text: 'Human #12 detected', color: '#ef4444' },
-      { timestamp: '17:54:21', type: 'wall', text: 'Static wall detected', color: '#f97316' }
+      { timestamp: '17:54:08', type: 'drivable', text: 'Terrain grid initialised · 4-lane corridor', color: '#00e676' },
+      { timestamp: '17:54:09', type: 'wall', text: 'Retaining wall segment mapped', color: '#ef4444' },
+      { timestamp: '17:54:10', type: 'pole', text: 'Pole #11 detected', color: '#ff5252' },
+      { timestamp: '17:54:11', type: 'vehicle', text: 'Vehicle #04 detected (lead)', color: '#facc15' }
     ];
 
     this.initComponents();
@@ -45,9 +44,10 @@ class DashboardApp {
   initComponents() {
     // 1. Header
     this.header = createHeader(document.getElementById('header-mount'), (scenarioIdx) => {
-      // Jump distance directly to corresponding landmark
-      const targetDistances = [0.0, 195.0, 105.0, 265.0];
-      this.distanceTraveled = targetDistances[scenarioIdx] || 0.0;
+      // Jump to the start of the chosen scenario zone on the loop
+      const zone = WORLD_MODEL.scenarios[scenarioIdx] || WORLD_MODEL.scenarios[0];
+      this.distanceTraveled = zone.start;
+      this.lastEventS = zone.start;
     });
 
     // 2. Left Sidebar Panels
@@ -89,8 +89,9 @@ class DashboardApp {
   }
 
   renderFrame(distS) {
-    const frame = WORLD_MODEL.sampleAtDistance(distS, performance.now() / 1000.0);
+    const frame = WORLD_MODEL.sampleAtDistance(distS);
     if (!frame) return;
+    this.lastFrame = frame;
 
     // Update Header & Scene Info
     this.header.update(frame.scene);
@@ -131,18 +132,19 @@ class DashboardApp {
       this.lastFrameTime = now;
 
       if (!this.isPaused) {
-        // Admin-editable base speed (CONFIG.egoSpeedMps), scaled by the playback control
-        this.distanceTraveled += CONFIG.egoSpeedMps * deltaSec * this.playbackSpeed;
+        // Ego follows the curvature-limited speed profile, scaled by playback
+        const speedMps = this.lastFrame?.scene.speed_mps ?? CONFIG.egoSpeedMps;
+        this.distanceTraveled += speedMps * Math.min(deltaSec, 0.1) * this.playbackSpeed;
 
         // Dynamic event log trigger as vehicle passes landmarks
-        if (this.distanceTraveled - this.lastEventS > 35.0) {
+        if (this.distanceTraveled - this.lastEventS > 45.0) {
           this.lastEventS = this.distanceTraveled;
-          this.appendLiveEvent(this.distanceTraveled);
+          this.appendLiveEvent(this.lastFrame);
         }
 
-        // Render at 60 FPS
-        this.renderFrame(this.distanceTraveled);
       }
+      // Keep rendering while paused so camera moves, zoom and the LiDAR sweep stay live
+      this.renderFrame(this.distanceTraveled);
 
       requestAnimationFrame(loop);
     };
@@ -150,28 +152,37 @@ class DashboardApp {
     requestAnimationFrame(loop);
   }
 
-  appendLiveEvent(s) {
-    const loopS = ((s % WORLD_MODEL.totalLength) + WORLD_MODEL.totalLength) % WORLD_MODEL.totalLength;
-    const timeFormatted = `17:55:${String(Math.floor(12 + (loopS * 0.2) % 48)).padStart(2, '0')}`;
-    let newEvent = null;
-
-    if (loopS < 85) {
-      newEvent = { timestamp: timeFormatted, type: 'vehicle', text: 'Tracking #04 (10.8 m/s)', color: '#00e676' };
-    } else if (loopS < 165) {
-      newEvent = { timestamp: timeFormatted, type: 'pothole', text: 'Pothole #21 detected (-0.22m)', color: '#c084fc' };
-    } else if (loopS < 255) {
-      newEvent = { timestamp: timeFormatted, type: 'turn', text: 'Left turn in progress (-41.7°)', color: '#f97316' };
+  appendLiveEvent(frame) {
+    if (!frame) return;
+    const time = frame.scene.system_time;
+    const objs = frame.objects;
+    const nearest = (cls) => objs.filter(o => o.class === cls && o.position[1] > -2).sort((a, b) => a.distance_m - b.distance_m)[0];
+    let ev;
+    const pothole = nearest('pothole');
+    const veh = nearest('dynamic_vehicle');
+    const human = nearest('dynamic_human');
+    const rock = nearest('unclassified');
+    if (pothole && pothole.distance_m < 60) {
+      ev = { type: 'pothole', text: `${cap(pothole.name)} ahead · ${pothole.distance_m.toFixed(0)} m (-0.22 m)`, color: '#c084fc' };
+    } else if (rock && rock.distance_m < 70) {
+      ev = { type: 'unclassified', text: `Rockfall debris on shoulder · ${rock.distance_m.toFixed(0)} m`, color: '#94a3b8' };
+    } else if (frame.road.turn !== 'Straight' && frame.road.radius_m < 80) {
+      ev = { type: 'turn', text: `${frame.road.turn} bend R ${frame.road.radius_m} m · slowing`, color: '#f97316' };
+    } else if (veh && veh.distance_m < 70) {
+      const dir = veh.direction === 'Oncoming' ? 'oncoming' : 'lead';
+      ev = { type: 'vehicle', text: `Tracking ${cap(veh.name)} (${dir}, ${veh.velocity_mps.toFixed(1)} m/s)`, color: '#facc15' };
+    } else if (human && human.distance_m < 60) {
+      ev = { type: 'human', text: `${cap(human.name)} on shoulder · ${human.distance_m.toFixed(0)} m`, color: '#f97316' };
     } else {
-      newEvent = { timestamp: timeFormatted, type: 'drivable', text: 'Forward trajectory clear', color: '#00e676' };
+      ev = { type: 'drivable', text: `Drivable corridor clear · grade ${frame.road.grade_pct} %`, color: '#00e676' };
     }
-
-    if (newEvent) {
-      this.eventsHistory.unshift(newEvent);
-      if (this.eventsHistory.length > 8) {
-        this.eventsHistory.pop();
-      }
-    }
+    this.eventsHistory.unshift({ timestamp: time, ...ev });
+    if (this.eventsHistory.length > 8) this.eventsHistory.pop();
   }
+}
+
+function cap(name) {
+  return name.charAt(0) + name.slice(1).toLowerCase();
 }
 
 // Start application (Handles immediate execution if document is already ready)

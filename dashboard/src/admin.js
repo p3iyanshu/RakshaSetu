@@ -6,13 +6,13 @@
  * Detection Panel is live even without the main dashboard tab open.
  */
 
-import { WORLD_MODEL } from './lib/worldModel.js?v=5';
-import { CONFIG } from './lib/config.js?v=5';
-import { VEHICLES } from './lib/vehicleRecords.js?v=5';
-import { createAdminHeader } from './components/admin/AdminHeader.js?v=5';
-import { createSidebar } from './components/admin/Sidebar.js?v=5';
-import { createDetectionPanel } from './components/admin/DetectionPanel.js?v=5';
-import { createAccidentRecords } from './components/admin/AccidentRecords.js?v=5';
+import { WORLD_MODEL } from './lib/worldModel.js';
+import { CONFIG } from './lib/config.js';
+import { VEHICLES } from './lib/vehicleRecords.js?v=8';
+import { createAdminHeader } from './components/admin/AdminHeader.js?v=8';
+import { createSidebar } from './components/admin/Sidebar.js?v=8';
+import { createDetectionPanel } from './components/admin/DetectionPanel.js?v=8';
+import { createAccidentRecords } from './components/admin/AccidentRecords.js?v=8';
 
 class AdminApp {
   constructor() {
