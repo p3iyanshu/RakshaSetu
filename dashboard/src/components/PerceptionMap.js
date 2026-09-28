@@ -41,7 +41,7 @@ export function createPerceptionMap(container, onSelectObject) {
       <div class="map-hud map-hud-top-left">
         <div class="hud-title">
           <span class="hud-live-dot"></span>LIVE 2.5D SCENE
-          <span class="hud-mode" data-ref="mode-label">PERSPECTIVE</span>
+          <span class="hud-mode" data-ref="mode-label">2.5D TOP</span>
         </div>
         <div class="hud-grid">
           <span>Curve</span><b data-ref="curve">—</b>
@@ -70,8 +70,7 @@ export function createPerceptionMap(container, onSelectObject) {
         </div>
         <div class="view-controls">
           <div class="seg-group" role="group" aria-label="Camera view">
-            <button class="seg-btn active" data-view="2.5D">2.5D</button>
-            <button class="seg-btn" data-view="TOP">TOP</button>
+            <button class="seg-btn active" data-view="TOP">2.5D</button>
             <button class="seg-btn" data-view="CHASE">CHASE</button>
           </div>
           <div class="seg-group" role="group" aria-label="Layers">
@@ -152,7 +151,7 @@ export function createPerceptionMap(container, onSelectObject) {
       if (!renderer) return;
       renderer.setMode(btn.dataset.view);
       container.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b === btn));
-      refs['mode-label'].textContent = { '2.5D': 'PERSPECTIVE', TOP: 'ORTHO TOP', CHASE: 'CHASE CAM' }[btn.dataset.view];
+      refs['mode-label'].textContent = { TOP: '2.5D TOP', CHASE: 'CHASE CAM' }[btn.dataset.view];
     });
   });
   container.querySelectorAll('[data-layer]').forEach(btn => {
