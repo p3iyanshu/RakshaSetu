@@ -91,6 +91,26 @@ export function createSelectedObject(container) {
           <circle cx="50" cy="50" r="2.5" fill="#c084fc"/>
         </svg>
       `;
+    } else if (objClass === 'explosive') {
+      previewBox.innerHTML = `
+        <svg viewBox="0 0 100 100" class="preview-svg explosive-preview" width="65" height="65">
+          <path d="M50 22 L76 36 L50 50 L24 36 Z" fill="#3f4a2f" stroke="#ff1744" stroke-width="1.4"/>
+          <path d="M24 36 L50 50 L50 78 L24 64 Z" fill="#2f3824" stroke="#ff1744" stroke-width="1.4"/>
+          <path d="M76 36 L50 50 L50 78 L76 64 Z" fill="#252c1c" stroke="#ff1744" stroke-width="1.4"/>
+          <circle cx="50" cy="30" r="4" fill="#ff1744"/>
+          <text x="50" y="94" text-anchor="middle" font-size="9" fill="#ff8a80" font-family="JetBrains Mono, monospace">EXPLOSIVE</text>
+        </svg>
+      `;
+    } else if (objClass === 'unclassified') {
+      // Neutral box: the class is unknown, so no shape is implied
+      previewBox.innerHTML = `
+        <svg viewBox="0 0 100 100" class="preview-svg unknown-preview" width="65" height="65">
+          <path d="M50 22 L76 36 L50 50 L24 36 Z" fill="#6b7280" stroke="#94a3b8" stroke-width="1.2"/>
+          <path d="M24 36 L50 50 L50 78 L24 64 Z" fill="#4b5563" stroke="#94a3b8" stroke-width="1.2"/>
+          <path d="M76 36 L50 50 L50 78 L76 64 Z" fill="#374151" stroke="#94a3b8" stroke-width="1.2"/>
+          <text x="50" y="94" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="JetBrains Mono, monospace">CLASS ?</text>
+        </svg>
+      `;
     } else if (objClass.includes('pole')) {
       // Flat Red/Salmon Pole Marker
       previewBox.innerHTML = `

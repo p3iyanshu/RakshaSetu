@@ -25,9 +25,10 @@ const CLASS_COLOR = {
   static_tree: SEMANTIC_COLORS.static_tree,
   pothole: SEMANTIC_COLORS.pothole,
   curb: SEMANTIC_COLORS.curb,
-  unclassified: '#94a3b8'
+  unclassified: '#94a3b8',
+  explosive: '#ff1744'
 };
-const CARD_CLASSES = new Set(['dynamic_vehicle', 'dynamic_human', 'pothole', 'unclassified']);
+const CARD_CLASSES = new Set(['dynamic_vehicle', 'dynamic_human', 'pothole', 'unclassified', 'explosive']);
 const RING_RADII = [10, 30, 60, 120];
 
 export function createPerceptionMap(container, onSelectObject) {
@@ -126,6 +127,7 @@ export function createPerceptionMap(container, onSelectObject) {
 
   let currentFrame = null;
   let selectedObjectId = '04';
+  let alertIds = new Set();   // tracks raising the unidentified-object alert
   let cssW = 800, cssH = 600, dpr = 1;
   let projected = [];   // [{obj, x, y, top}] from the last render, for picking
 
@@ -276,6 +278,7 @@ export function createPerceptionMap(container, onSelectObject) {
       const color = CLASS_COLOR[obj.class] || '#94a3b8';
       el.style.setProperty('--tag-color', color);
       el.classList.toggle('is-selected', it.selected);
+      el.classList.toggle('is-alert', !!it.alert);
       el.style.transform = `translate(${anchor.x.toFixed(1)}px, ${anchor.y.toFixed(1)}px)`;
       const html = compact
         ? `${obj.name}`
@@ -371,14 +374,17 @@ export function createPerceptionMap(container, onSelectObject) {
 
       if (selected) drawSelectionBox(octx, obj, P);
 
+      const alert = alertIds.has(String(obj.track_id));
+      if (alert) drawAlertPulse(octx, obj, P);
+
       const important = CARD_CLASSES.has(obj.class);
-      if (selected || (important && obj.distance_m < 95) || (!important && obj.distance_m < 55)) {
-        labelItems.push({ obj, top, selected, compact: !selected && !important });
+      if (alert || selected || (important && obj.distance_m < 95) || (!important && obj.distance_m < 55)) {
+        labelItems.push({ obj, top, selected, alert, compact: !alert && !selected && !important });
       }
     }
 
     // Declutter: nearest full cards first, cap the count
-    labelItems.sort((a, b) => (b.selected - a.selected) || (a.obj.distance_m - b.obj.distance_m));
+    labelItems.sort((a, b) => (b.alert - a.alert) || (b.selected - a.selected) || (a.obj.distance_m - b.obj.distance_m));
     let cards = 0;
     // HUD panels are obstacles for label placement
     const vp = container.getBoundingClientRect();
@@ -389,7 +395,7 @@ export function createPerceptionMap(container, onSelectObject) {
     const finalItems = [];
     for (const it of labelItems) {
       const maxCards = cssW < 520 ? 2 : (cssW < 800 ? 4 : 6);
-      if (!it.compact && !it.selected && cards >= maxCards) it.compact = true;
+      if (!it.compact && !it.selected && !it.alert && cards >= maxCards) it.compact = true;
       const size = labelSize.get(String(it.obj.track_id) + (it.compact ? 't' : 'c'));
       const wEst = size ? size.w : (it.compact ? 70 : 130), hEst = size ? size.h : (it.compact ? 18 : 36);
       let ax = it.top.x + 12, ay = it.top.y - hEst - 10;
@@ -403,7 +409,7 @@ export function createPerceptionMap(container, onSelectObject) {
         ay = hit.y - hEst - 4 >= 4 ? hit.y - hEst - 4 : hit.y + hit.h + 4;
       }
       const stillHit = placed.some(r => ax < r.x + r.w && ax + wEst > r.x && ay < r.y + r.h && ay + hEst > r.y);
-      if (stillHit && !it.selected) continue;   // no free slot: drop the label, keep the 3D object
+      if (stillHit && !it.selected && !it.alert) continue;   // no free slot: drop the label, keep the 3D object
       placed.push({ x: ax, y: ay, w: wEst, h: hEst });
       if (!it.compact) cards++;
       // Leader line from object top to the label corner
@@ -433,9 +439,10 @@ export function createPerceptionMap(container, onSelectObject) {
   }
 
   return {
-    update(frame, selectedId) {
+    update(frame, selectedId, alerts) {
       currentFrame = frame;
       if (selectedId !== undefined) selectedObjectId = String(selectedId);
+      alertIds = alerts || new Set();
       render();
     },
     destroy() {}
@@ -465,6 +472,29 @@ function drawArrow(ctx, a, b, color) {
   ctx.lineTo(b.x - ux * 7 + uy * 4, b.y - uy * 7 - ux * 4);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
+}
+
+/** Pulsing danger ring on the ground around an object raising an alert. */
+function drawAlertPulse(ctx, obj, P) {
+  const w = obj.world;
+  const t = (performance.now() / 1000) % 1.2 / 1.2;           // 0..1 every 1.2 s
+  ctx.save();
+  for (const [phase, alpha] of [[t, 0.9], [(t + 0.5) % 1, 0.9]]) {
+    const r = 1.2 + phase * 4.5;
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i <= 40; i++) {
+      const a = (i / 40) * Math.PI * 2;
+      const q = P(w.x + Math.cos(a) * r, w.y + Math.sin(a) * r, w.z + 0.05);
+      if (!q) { started = false; continue; }
+      started ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y);
+      started = true;
+    }
+    ctx.strokeStyle = `rgba(239, 68, 68, ${alpha * (1 - phase)})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

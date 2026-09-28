@@ -5,15 +5,16 @@
 
 import { WORLD_MODEL } from './lib/worldModel.js';
 import { CONFIG, onConfigChange } from './lib/config.js';
-import { createHeader } from './components/Header.js?v=37';
-import { createSceneInfo } from './components/SceneInfo.js?v=37';
-import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=37';
-import { createSemanticLegend } from './components/SemanticLegend.js?v=37';
-import { createPerceptionMap } from './components/PerceptionMap.js?v=37';
-import { createEventsPanel } from './components/EventsPanel.js?v=37';
-import { createSelectedObject } from './components/SelectedObject.js?v=37';
-import { createElevationPanel } from './components/ElevationPanel.js?v=37';
-import { createMetricsBar } from './components/MetricsBar.js?v=37';
+import { createHeader } from './components/Header.js?v=41';
+import { createSceneInfo } from './components/SceneInfo.js?v=41';
+import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=41';
+import { createSemanticLegend } from './components/SemanticLegend.js?v=41';
+import { createPerceptionMap } from './components/PerceptionMap.js?v=41';
+import { createEventsPanel } from './components/EventsPanel.js?v=41';
+import { createSelectedObject } from './components/SelectedObject.js?v=41';
+import { createElevationPanel } from './components/ElevationPanel.js?v=41';
+import { createMetricsBar } from './components/MetricsBar.js?v=41';
+import { createAnomalyAlert } from './components/AnomalyAlert.js?v=41';
 
 class DashboardApp {
   constructor() {
@@ -60,6 +61,24 @@ class DashboardApp {
       this.selectObject(selectedObj.track_id || selectedObj.id);
     });
 
+    // Unidentified-object alert, overlaid on the perception map
+    this.anomalyAlert = createAnomalyAlert(document.getElementById('map-mount'), {
+      onRaise: (obj, kind) => {
+        const explosive = kind === 'explosive';
+        this.eventsHistory.unshift({
+          timestamp: this.lastFrame?.scene.system_time || '',
+          type: 'alert',
+          text: explosive
+            ? `EXPLOSIVE #${obj.track_id} detected · ${obj.distance_m.toFixed(0)} m · halt & keep clear`
+            : `Unidentified object #${obj.track_id} · stationary · inspection recommended`,
+          color: explosive ? '#ff1744' : '#ef4444'
+        });
+        if (explosive) this.selectObject(obj.track_id);
+        if (this.eventsHistory.length > 8) this.eventsHistory.pop();
+      },
+      onSelect: (id) => this.selectObject(id)
+    });
+
     // 4. Right Sidebar Panels
     this.eventsPanel = createEventsPanel(document.getElementById('events-mount'));
     this.selectedObject = createSelectedObject(document.getElementById('selected-object-mount'));
@@ -97,8 +116,11 @@ class DashboardApp {
     this.header.update(frame.scene);
     this.sceneInfo.update(frame.scene);
 
+    // Alert first, so the map can pulse the objects that raise it
+    const alertIds = this.anomalyAlert ? this.anomalyAlert.update(frame) : new Set();
+
     // Update Perception Map Canvas & Overlays (60fps smooth float positions)
-    this.perceptionMap.update(frame, this.selectedObjectId);
+    this.perceptionMap.update(frame, this.selectedObjectId, alertIds);
 
     // Update Selected Object
     const currentSel = frame.objects.find(o => String(o.track_id) === String(this.selectedObjectId)) 
@@ -161,7 +183,7 @@ class DashboardApp {
     const pothole = nearest('pothole');
     const veh = nearest('dynamic_vehicle');
     const human = nearest('dynamic_human');
-    const rock = nearest('unclassified');
+    const rock = objs.filter(o => o.ui_class === 'Rockfall Debris' && o.position[1] > -2).sort((a, b) => a.distance_m - b.distance_m)[0];
     if (pothole && pothole.distance_m < 60) {
       ev = { type: 'pothole', text: `${cap(pothole.name)} ahead · ${pothole.distance_m.toFixed(0)} m (-0.22 m)`, color: '#c084fc' };
     } else if (rock && rock.distance_m < 70) {
