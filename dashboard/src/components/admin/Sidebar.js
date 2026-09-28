@@ -154,15 +154,17 @@ export function createSidebar(container, { vehicles, onSelectVehicle, onNavChang
 
   renderCurrent();
 
+  function setView(view) {
+    navButtons.forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+    if (onNavChange) onNavChange(view);
+  }
+
   navButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      navButtons.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      if (onNavChange) onNavChange(btn.dataset.view);
-    });
+    btn.addEventListener('click', () => setView(btn.dataset.view));
   });
 
   return {
+    setView,
     getSelectedVehicle() {
       return vehicles.find((v) => v.vehicleNumber === selectedVehicleNumber);
     }
