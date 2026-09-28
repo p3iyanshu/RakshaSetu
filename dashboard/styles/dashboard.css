@@ -1186,3 +1186,100 @@ body:has(#nl-badge-frame) .rs-bottom-bar { padding-right: 190px; }
   .status-pill { padding: 6px 8px; }
   .rs-title { font-size: 14px; }
 }
+
+/* ==========================================================================
+   UNIDENTIFIED-OBJECT ALERT (AnomalyAlert.js)
+   ========================================================================== */
+:root {
+  --danger: #ef4444;
+  --danger-bg: rgba(60, 8, 10, 0.92);
+}
+
+.anomaly-alert-stack {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: min(560px, calc(100% - 24px));
+  pointer-events: none;
+}
+
+.anomaly-alert {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 12px 7px 8px;
+  text-align: left;
+  cursor: pointer;
+  color: #fff;
+  font-family: var(--font-main);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-left: 4px solid var(--danger);
+  border-radius: 4px;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55), 0 8px 20px rgba(0, 0, 0, 0.6);
+  animation: anomaly-pulse 1.2s ease-out infinite;
+}
+
+.anomaly-alert:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.anomaly-alert-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: #1a0304;
+  background: var(--danger);
+  border-radius: 50%;
+}
+
+.anomaly-alert-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.anomaly-alert-title { font-size: 11px; font-weight: 800; letter-spacing: 0.6px; color: #fecaca; }
+.anomaly-alert-meta { font-size: 9.5px; color: #fca5a5; opacity: 0.9; }
+
+@keyframes anomaly-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55), 0 8px 20px rgba(0, 0, 0, 0.6); }
+  70%  { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0), 0 8px 20px rgba(0, 0, 0, 0.6); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0), 0 8px 20px rgba(0, 0, 0, 0.6); }
+}
+
+/* Map callout for an alerting track */
+.map-callout-card.is-alert,
+.map-tag.is-alert {
+  border-color: var(--danger) !important;
+  border-left-color: var(--danger) !important;
+  animation: anomaly-pulse 1.2s ease-out infinite;
+}
+.map-callout-card.is-alert .callout-header { color: #fca5a5; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anomaly-alert, .map-callout-card.is-alert, .map-tag.is-alert { animation: none; }
+}
+
+@media (max-width: 699px) {
+  .anomaly-alert-stack { top: auto; bottom: 64px; max-width: calc(100% - 12px); }
+  .anomaly-alert-title { font-size: 10px; }
+}
+
+/* Explosive alert: stronger than the unidentified-object alert */
+.dot-explosive { background: #ff1744; }
+.anomaly-alert.is-explosive {
+  background: rgba(90, 0, 10, 0.95);
+  border-color: #ff1744;
+  border-left-width: 6px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.anomaly-alert.is-explosive .anomaly-alert-icon { background: #ff1744; width: 26px; height: 26px; font-size: 15px; }
+.anomaly-alert.is-explosive .anomaly-alert-title { font-size: 12.5px; color: #fff; letter-spacing: 0.8px; }
+.anomaly-alert.is-explosive .anomaly-alert-meta { color: #ff8a80; }
