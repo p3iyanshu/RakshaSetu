@@ -5,16 +5,16 @@
 
 import { WORLD_MODEL } from './lib/worldModel.js';
 import { CONFIG, onConfigChange } from './lib/config.js';
-import { createHeader } from './components/Header.js?v=41';
-import { createSceneInfo } from './components/SceneInfo.js?v=41';
-import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=41';
-import { createSemanticLegend } from './components/SemanticLegend.js?v=41';
-import { createPerceptionMap } from './components/PerceptionMap.js?v=41';
-import { createEventsPanel } from './components/EventsPanel.js?v=41';
-import { createSelectedObject } from './components/SelectedObject.js?v=41';
-import { createElevationPanel } from './components/ElevationPanel.js?v=41';
-import { createMetricsBar } from './components/MetricsBar.js?v=41';
-import { createAnomalyAlert } from './components/AnomalyAlert.js?v=41';
+import { createHeader } from './components/Header.js?v=45';
+import { createSceneInfo } from './components/SceneInfo.js?v=45';
+import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=45';
+import { createSemanticLegend } from './components/SemanticLegend.js?v=45';
+import { createPerceptionMap } from './components/PerceptionMap.js?v=45';
+import { createEventsPanel } from './components/EventsPanel.js?v=45';
+import { createSelectedObject } from './components/SelectedObject.js?v=45';
+import { createElevationPanel } from './components/ElevationPanel.js?v=45';
+import { createMetricsBar } from './components/MetricsBar.js?v=45';
+import { createAnomalyAlert } from './components/AnomalyAlert.js?v=45';
 
 class DashboardApp {
   constructor() {
@@ -63,17 +63,13 @@ class DashboardApp {
 
     // Unidentified-object alert, overlaid on the perception map
     this.anomalyAlert = createAnomalyAlert(document.getElementById('map-mount'), {
-      onRaise: (obj, kind) => {
-        const explosive = kind === 'explosive';
+      onRaise: (obj) => {
         this.eventsHistory.unshift({
           timestamp: this.lastFrame?.scene.system_time || '',
           type: 'alert',
-          text: explosive
-            ? `EXPLOSIVE #${obj.track_id} detected · ${obj.distance_m.toFixed(0)} m · halt & keep clear`
-            : `Unidentified object #${obj.track_id} · stationary · inspection recommended`,
-          color: explosive ? '#ff1744' : '#ef4444'
+          text: `Unidentified object #${obj.track_id} · stationary · inspection recommended`,
+          color: '#ef4444'
         });
-        if (explosive) this.selectObject(obj.track_id);
         if (this.eventsHistory.length > 8) this.eventsHistory.pop();
       },
       onSelect: (id) => this.selectObject(id)

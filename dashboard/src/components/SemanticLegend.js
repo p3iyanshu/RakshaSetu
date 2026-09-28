@@ -20,7 +20,6 @@ export function createSemanticLegend(container) {
           <div class="legend-item"><span class="legend-dot dot-pothole"></span><span class="legend-label">Pothole / Negative Obstacle</span></div>
           <div class="legend-item"><span class="legend-dot dot-curb"></span><span class="legend-label">Curb</span></div>
           <div class="legend-item"><span class="legend-dot dot-unclassified"></span><span class="legend-label">Unclassified</span></div>
-          <div class="legend-item"><span class="legend-dot dot-explosive"></span><span class="legend-label">Explosive (simulated)</span></div>
         </div>
         <div class="legend-divider"></div>
         <div class="legend-list">

@@ -52,7 +52,6 @@ function objectReturns(obj, out) {
   else if (obj.class === 'dynamic_human') color = COLORS.dynamic;
   else if (obj.class === 'curb') color = COLORS.hazard;
   else if (obj.class === 'unclassified') color = '#94a3b8';
-  else if (obj.class === 'explosive') color = '#ff1744';
   const l = obj.class === 'static_wall' ? Math.min(b.l, 16) : b.l;
   const step = Math.max(0.25, Math.min(0.6, Math.max(l, b.w) / 9));
   const c = Math.cos(w.yaw), s = Math.sin(w.yaw);

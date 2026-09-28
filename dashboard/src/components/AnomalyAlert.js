@@ -11,19 +11,11 @@
  *
  * LiDAR measures geometry only; this flags "can't classify it and it isn't
  * moving" for a human to inspect. It makes no claim about what the object is.
- *
- * Separately, a track whose class is 'explosive' raises an EXPLOSIVE alert
- * immediately. That label comes only from the simulation scenario (see
- * worldModel.js), never from LiDAR segmentation.
  */
 
 const OTHER_UNKNOWN = 5;
 const CONF_THRESHOLD = 50;          // percent; frame confidences are 0-100
 const MIN_STATIONARY_FRAMES = 5;
-
-function isExplosive(obj) {
-  return obj.class === 'explosive';
-}
 
 function qualifies(obj) {
   return obj.cls === OTHER_UNKNOWN && obj.confidence < CONF_THRESHOLD && obj.is_dynamic === false;
@@ -37,7 +29,7 @@ export function createAnomalyAlert(mapContainer, { onRaise, onSelect } = {}) {
   mapContainer.appendChild(root);
 
   const streaks = new Map();   // track_id -> consecutive qualifying frames
-  const raised = new Map();    // track_id -> 'explosive' | 'unknown' currently alerting
+  const raised = new Set();    // track_ids currently alerting
   let lastHtml = '';
 
   root.addEventListener('click', (e) => {
@@ -52,36 +44,24 @@ export function createAnomalyAlert(mapContainer, { onRaise, onSelect } = {}) {
       for (const obj of frame?.objects || []) {
         const id = String(obj.track_id);
         seen.add(id);
-        if (isExplosive(obj)) streaks.set(id, MIN_STATIONARY_FRAMES);   // no warm-up needed
-        else if (qualifies(obj)) streaks.set(id, (streaks.get(id) || 0) + 1);
+        if (qualifies(obj)) streaks.set(id, (streaks.get(id) || 0) + 1);
         else streaks.delete(id);
       }
       for (const id of [...streaks.keys()]) if (!seen.has(id)) streaks.delete(id);
 
       const active = (frame?.objects || [])
         .filter(o => (streaks.get(String(o.track_id)) || 0) >= MIN_STATIONARY_FRAMES)
-        .sort((a, b) => (isExplosive(b) - isExplosive(a)) || (a.distance_m - b.distance_m));
+        .sort((a, b) => a.distance_m - b.distance_m);
       const activeIds = new Set(active.map(o => String(o.track_id)));
 
-      // Notify on a new alert, including escalation from unknown to explosive
-      const next = new Map();
       for (const o of active) {
         const id = String(o.track_id);
-        const kind = isExplosive(o) ? 'explosive' : 'unknown';
-        if (raised.get(id) !== kind && onRaise) onRaise(o, kind);
-        next.set(id, kind);
+        if (!raised.has(id) && onRaise) onRaise(o);
       }
       raised.clear();
-      next.forEach((kind, id) => raised.set(id, kind));
+      activeIds.forEach(id => raised.add(id));
 
-      const html = active.map(o => isExplosive(o) ? `
-        <button type="button" class="anomaly-alert is-explosive" data-track="${o.track_id}" title="Select track #${o.track_id} on the map">
-          <span class="anomaly-alert-icon" aria-hidden="true">!</span>
-          <span class="anomaly-alert-body">
-            <span class="anomaly-alert-title">EXPLOSIVE DETECTED — TRACK #${o.track_id} — HALT &amp; KEEP CLEAR</span>
-            <span class="anomaly-alert-meta font-mono">${o.distance_m.toFixed(1)} m · ${o.position[0] < 0 ? 'left' : 'right'} shoulder · conf ${o.confidence}% · scenario label (simulated)</span>
-          </span>
-        </button>` : `
+      const html = active.map(o => `
         <button type="button" class="anomaly-alert" data-track="${o.track_id}" title="Select track #${o.track_id} on the map">
           <span class="anomaly-alert-icon" aria-hidden="true">!</span>
           <span class="anomaly-alert-body">

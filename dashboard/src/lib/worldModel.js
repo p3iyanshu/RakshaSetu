@@ -40,13 +40,8 @@ export const CLASS_IDS = {
   static_tree: 2,
   dynamic_vehicle: 3,    // DYNAMIC_VEHICLE
   dynamic_human: 4,      // DYNAMIC_PEDESTRIAN
-  unclassified: 5,       // OTHER_UNKNOWN
-  explosive: 5           // simulation-only label; no pipeline class exists for it
+  unclassified: 5        // OTHER_UNKNOWN
 };
-
-// Range (m) inside which a scenario explosive is reported as such.
-// The label is simulation ground truth: LiDAR alone only sees an unknown box.
-export const EXPLOSIVE_DETECT_RANGE_M = 30;
 
 // Scenario zones along the loop (start s, name). Speeds come from CONFIG.
 export const SCENARIOS = [
@@ -82,11 +77,6 @@ export class WorldModel {
     // Static infrastructure & static pedestrians (road frame: s, d)
     this.staticObjects = [
       // Highway cruise
-      // Scenario explosive on the left shoulder: an unknown box until the ego is
-      // within EXPLOSIVE_DETECT_RANGE_M, then reported with its scenario label
-      { track_id: '45', name: 'OBJECT #45', class: 'unclassified', ui_class: 'Unidentified Object', shape: 'box',
-        s: 185, d: -9.2, confidence: 0.38, bbox: { l: 0.6, w: 0.45, h: 0.4 },
-        scenario: { class: 'explosive', name: 'EXPLOSIVE #45', ui_class: 'Explosive (simulated)', confidence: 0.92 } },
       { track_id: '11', name: 'POLE #11', class: 'static_pole', ui_class: 'Static Pole', s: 62, d: -9.6, confidence: 0.95, bbox: BBOX.pole },
       { track_id: '12', name: 'HUMAN #12', class: 'dynamic_human', ui_class: 'Dynamic Human', s: 96, d: -9.8, confidence: 0.91, bbox: BBOX.human },
       { track_id: '09', name: 'POLE #09', class: 'static_pole', ui_class: 'Static Pole', s: 118, d: 9.6, confidence: 0.94, bbox: BBOX.pole },
@@ -284,23 +274,19 @@ export class WorldModel {
       const z = onRoad ? w.z : terrainHeight(w.x, w.y);
       const [rx, fy] = toEgo(w.x, w.y);
       const dist = Math.hypot(rx, fy);
-      // Scenario objects take their scenario label once the ego has come within
-      // detection range, and keep it after passing (the track stays identified)
-      const identified = obj.scenario && (dist <= EXPLOSIVE_DETECT_RANGE_M || ds < 0);
-      const id = identified ? { ...obj, ...obj.scenario } : obj;
       visibleObjects.push({
         track_id: obj.track_id,
-        name: id.name,
-        class: id.class,
-        cls: CLASS_IDS[id.class] ?? 5,
-        ui_class: id.ui_class,
+        name: obj.name,
+        class: obj.class,
+        cls: CLASS_IDS[obj.class] ?? 5,
+        ui_class: obj.ui_class,
         shape: obj.shape,
         position: [Number(rx.toFixed(2)), Number(fy.toFixed(2))],
         world: { x: w.x, y: w.y, z, yaw: w.yaw },
         road: { s: obj.s, d: obj.d },
         velocity_mps: 0.0,
         distance_m: Number(dist.toFixed(1)),
-        confidence: Math.round(id.confidence * 100),
+        confidence: Math.round(obj.confidence * 100),
         is_dynamic: false,
         status: 'Stationary',
         radius: obj.radius || 1.0,
