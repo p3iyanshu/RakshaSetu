@@ -9,10 +9,10 @@
 import { WORLD_MODEL } from './lib/worldModel.js';
 import { VEHICLES } from './lib/vehicleRecords.js?v=32';
 import { createAdminHeader } from './components/admin/AdminHeader.js?v=32';
-import { createSidebar } from './components/admin/Sidebar.js?v=34';
+import { createSidebar } from './components/admin/Sidebar.js?v=35';
 import { createDetectionPanel } from './components/admin/DetectionPanel.js?v=34';
 import { createAccidentRecords } from './components/admin/AccidentRecords.js?v=32';
-import { createBasicInfoPanel } from './components/admin/BasicInfoPanel.js?v=34';
+import { createBasicInfoPanel } from './components/admin/BasicInfoPanel.js?v=36';
 
 class AdminApp {
   constructor() {
@@ -35,7 +35,9 @@ class AdminApp {
       }
     });
 
-    this.basicInfo = createBasicInfoPanel(document.getElementById('admin-basic-info-mount'));
+    this.basicInfo = createBasicInfoPanel(document.getElementById('admin-basic-info-mount'), {
+      onOpenAccidents: () => this.sidebar.setView('accidents')
+    });
     this.contentMount = document.getElementById('admin-content-mount');
     this.detectionPanel = null;
     this.accidentRecords = null;
