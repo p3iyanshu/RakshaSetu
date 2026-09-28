@@ -1,18 +1,18 @@
 /**
  * Mock fleet + accident-history data for the admin console.
  *
- * Static demo data (no backend, consistent with the rest of this
- * dashboard) — three of these vehicle numbers map onto the vehicles the
- * live worldModel simulation actually tracks (via trackId, matching
- * worldModel.js's dynamicVehicles #04/#18/#26) so the Detection Panel has
- * something live to show; the rest have trackId: null to demonstrate the
- * "not currently in perception range" state.
+ * Static demo data (no backend, consistent with the rest of this dashboard).
+ * Each ON ROAD vehicle drives the same mountain loop as the main dashboard,
+ * starting `routeOffsetM` metres along it, so selecting it in the admin
+ * console shows its own live telemetry and LiDAR feed. PARKED vehicles hold
+ * still at `routeOffsetM` with no live motion.
  */
 
 export const VEHICLES = [
   {
     vehicleNumber: 'RJ14 GA 2024',
-    trackId: '04',
+    status: 'ON ROAD',
+    routeOffsetM: 0,
     make: 'Maruti Suzuki Swift',
     color: 'White',
     accidents: [
@@ -32,7 +32,8 @@ export const VEHICLES = [
   },
   {
     vehicleNumber: 'RJ14 CV 8871',
-    trackId: '18',
+    status: 'ON ROAD',
+    routeOffsetM: 460,
     make: 'Tata Ace (Light Commercial)',
     color: 'Blue',
     accidents: [
@@ -46,14 +47,16 @@ export const VEHICLES = [
   },
   {
     vehicleNumber: 'RJ14 EF 5539',
-    trackId: '26',
+    status: 'ON ROAD',
+    routeOffsetM: 920,
     make: 'Mahindra Bolero',
     color: 'Silver',
     accidents: []
   },
   {
     vehicleNumber: 'RJ09 KL 1187',
-    trackId: null,
+    status: 'PARKED',
+    routeOffsetM: 700,
     make: 'Hyundai i20',
     color: 'Red',
     accidents: [
@@ -73,7 +76,8 @@ export const VEHICLES = [
   },
   {
     vehicleNumber: 'RJ02 BT 4420',
-    trackId: null,
+    status: 'PARKED',
+    routeOffsetM: 1180,
     make: 'Ashok Leyland Dost',
     color: 'White',
     accidents: [

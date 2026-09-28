@@ -1,28 +1,21 @@
 /**
  * Admin Console — Detection Panel
- * Basic vehicle information, interactive Grid Comparison (Adaptive vs. Uniform),
- * the live LiDAR point-cloud feed with live grid mode switching, and a detection log.
+ * Interactive Grid Comparison (Adaptive vs. Uniform), the live LiDAR
+ * point-cloud feed with live grid mode switching, and a detection log.
+ * (Basic vehicle information lives in the sidebar — see BasicInfoPanel.)
  */
 
-import { createLidarFeedPanel } from './LidarFeedPanel.js?v=8';
-import { createGridComparisonPanel } from './GridComparisonPanel.js?v=8';
+import { createLidarFeedPanel } from './LidarFeedPanel.js?v=32';
+import { createGridComparisonPanel } from './GridComparisonPanel.js?v=32';
 
 export function createDetectionPanel(container) {
   container.innerHTML = `
     <div class="admin-detection-grid">
       <div class="admin-detection-left">
-        <!-- 1. Basic Vehicle Information -->
-        <div class="rs-card admin-basic-info-card">
-          <div class="card-header">
-            <h2 class="card-title">BASIC INFORMATION</h2>
-          </div>
-          <div class="card-body" id="admin-basic-info-body"></div>
-        </div>
-
-        <!-- 2. Grid Comparison Panel (Adaptive vs. Uniform) -->
+        <!-- 1. Grid Comparison Panel (Adaptive vs. Uniform) -->
         <div id="admin-grid-comparison-mount"></div>
 
-        <!-- 3. Detection Log -->
+        <!-- 2. Detection Log -->
         <div class="rs-card admin-log-card">
           <div class="card-header">
             <h2 class="card-title">DETECTION LOG</h2>
@@ -36,7 +29,6 @@ export function createDetectionPanel(container) {
     </div>
   `;
 
-  const basicInfoElem = container.querySelector('#admin-basic-info-body');
   const logElem = container.querySelector('#admin-detection-log');
   const lidarFeedMount = container.querySelector('#admin-lidar-feed-mount');
   const gridCompMount = container.querySelector('#admin-grid-comparison-mount');
@@ -44,6 +36,7 @@ export function createDetectionPanel(container) {
   const lidarFeed = createLidarFeedPanel(lidarFeedMount);
 
   let previousTrackIds = new Set();
+  let lastVehicle = null;
   const events = [];
 
   function pushEvent(text, color) {
@@ -73,49 +66,15 @@ export function createDetectionPanel(container) {
   return {
     update(frame, vehicle) {
       if (!frame || !vehicle) return;
+      const onRoad = vehicle.status === 'ON ROAD';
 
-      const liveObj = vehicle.trackId
-        ? frame.objects.find((o) => String(o.track_id) === String(vehicle.trackId))
-        : null;
-
-      basicInfoElem.innerHTML = `
-        <div class="info-row">
-          <span class="info-label">Vehicle Number</span>
-          <span class="info-value font-mono">${vehicle.vehicleNumber}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Make / Model</span>
-          <span class="info-value">${vehicle.make}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Color</span>
-          <span class="info-value">${vehicle.color}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Status</span>
-          <span class="info-value ${liveObj ? 'text-cyan' : 'text-muted'}">
-            ${liveObj ? 'LIVE — IN PERCEPTION RANGE' : 'NOT CURRENTLY DETECTED'}
-          </span>
-        </div>
-        ${
-          liveObj
-            ? `
-        <div class="info-row"><span class="info-label">Track ID</span><span class="info-value font-mono">#${liveObj.track_id}</span></div>
-        <div class="info-row"><span class="info-label">Position (x, y)</span><span class="info-value font-mono">${liveObj.position[0]}, ${liveObj.position[1]}</span></div>
-        <div class="info-row"><span class="info-label">Distance</span><span class="info-value font-mono">${liveObj.distance_m} m</span></div>
-        <div class="info-row"><span class="info-label">Velocity</span><span class="info-value font-mono">${liveObj.velocity_mps.toFixed(1)} m/s</span></div>
-        <div class="info-row"><span class="info-label">Confidence</span><span class="info-value font-mono">${liveObj.confidence}%</span></div>
-        `
-            : `<div class="admin-empty-state">This vehicle is outside the current perception field, so no live data points exist for it right now.</div>`
-        }
-        <div class="info-row">
-          <span class="info-label">Accident History</span>
-          <span class="info-value ${vehicle.accidents.length ? 'text-orange' : 'text-cyan'}">
-            ${vehicle.accidents.length} record${vehicle.accidents.length === 1 ? '' : 's'}
-          </span>
-        </div>
-      `;
-
+      // A new vehicle means a new viewpoint: snap the feed camera and restart the log
+      if (vehicle !== lastVehicle) {
+        lastVehicle = vehicle;
+        lidarFeed.resetView();
+        previousTrackIds = new Set();
+        pushEvent(`Feed switched to ${vehicle.vehicleNumber} (${onRoad ? 'on road' : 'parked'})`, '#00f2fe');
+      }
       gridComparison.update(frame);
       lidarFeed.update(frame);
 

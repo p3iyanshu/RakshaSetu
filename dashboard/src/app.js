@@ -5,15 +5,15 @@
 
 import { WORLD_MODEL } from './lib/worldModel.js';
 import { CONFIG, onConfigChange } from './lib/config.js';
-import { createHeader } from './components/Header.js?v=8';
-import { createSceneInfo } from './components/SceneInfo.js?v=8';
-import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=8';
-import { createSemanticLegend } from './components/SemanticLegend.js?v=8';
-import { createPerceptionMap } from './components/PerceptionMap.js?v=9';
-import { createEventsPanel } from './components/EventsPanel.js?v=8';
-import { createSelectedObject } from './components/SelectedObject.js?v=8';
-import { createElevationPanel } from './components/ElevationPanel.js?v=8';
-import { createMetricsBar } from './components/MetricsBar.js?v=8';
+import { createHeader } from './components/Header.js?v=30';
+import { createSceneInfo } from './components/SceneInfo.js?v=30';
+import { createAdaptiveGridPanel } from './components/AdaptiveGridPanel.js?v=30';
+import { createSemanticLegend } from './components/SemanticLegend.js?v=30';
+import { createPerceptionMap } from './components/PerceptionMap.js?v=30';
+import { createEventsPanel } from './components/EventsPanel.js?v=30';
+import { createSelectedObject } from './components/SelectedObject.js?v=30';
+import { createElevationPanel } from './components/ElevationPanel.js?v=30';
+import { createMetricsBar } from './components/MetricsBar.js?v=30';
 
 class DashboardApp {
   constructor() {

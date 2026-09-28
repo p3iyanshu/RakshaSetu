@@ -171,17 +171,43 @@ export function createPerceptionMap(container, onSelectObject) {
     if (renderer) renderer.zoomBy(e.deltaY > 0 ? 1.1 : 0.9);
   }, { passive: false });
 
-  // Drag to orbit, double-click to reset
+  // One pointer drags to orbit, two pointers pinch to zoom, double-click resets
   let drag = null;
-  overlay.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, moved: false }; });
+  const pointers = new Map();
+  let pinchDist = 0;
+  overlay.style.touchAction = 'none';
+  overlay.addEventListener('pointerdown', (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    drag = { x: e.clientX, moved: false };
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+    }
+  });
   window.addEventListener('pointermove', (e) => {
-    if (!drag || !renderer) return;
+    if (!renderer || !pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size >= 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDist > 0 && d > 0) renderer.zoomBy(pinchDist / d);
+      pinchDist = d;
+      if (drag) drag.moved = true;
+      return;
+    }
+    if (!drag) return;
     const dx = e.clientX - drag.x;
     if (Math.abs(dx) > 2) drag.moved = true;
     renderer.orbit(-dx * 0.006);
     drag.x = e.clientX;
   });
-  window.addEventListener('pointerup', () => { setTimeout(() => { drag = null; }, 0); });
+  const endPointer = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinchDist = 0;
+    if (pointers.size === 0) setTimeout(() => { drag = null; }, 0);
+  };
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
   overlay.addEventListener('dblclick', () => renderer && renderer.resetView());
 
   // ---- Picking -------------------------------------------------------------
@@ -363,7 +389,8 @@ export function createPerceptionMap(container, onSelectObject) {
     });
     const finalItems = [];
     for (const it of labelItems) {
-      if (!it.compact && !it.selected && cards >= 6) it.compact = true;
+      const maxCards = cssW < 520 ? 2 : (cssW < 800 ? 4 : 6);
+      if (!it.compact && !it.selected && cards >= maxCards) it.compact = true;
       const size = labelSize.get(String(it.obj.track_id) + (it.compact ? 't' : 'c'));
       const wEst = size ? size.w : (it.compact ? 70 : 130), hEst = size ? size.h : (it.compact ? 18 : 36);
       let ax = it.top.x + 12, ay = it.top.y - hEst - 10;
