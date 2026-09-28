@@ -291,14 +291,13 @@ export function createSceneRenderer(canvas) {
 
   // ---- Camera ------------------------------------------------------------
   const camera = {
-    mode: '2.5D',
+    mode: 'TOP',
     yaw: 0, targetYaw: null,
-    pitch: 46, dist: 150, fov: 40, ahead: 34,
+    pitch: 89.5, dist: 190, fov: 36, ahead: 26,
     orbitYaw: 0, zoom: 1,
     viewProj: null, eye: [0, 0, 0]
   };
   const PRESETS = {
-    '2.5D': { pitch: 46, dist: 150, fov: 40, ahead: 34 },
     'TOP': { pitch: 89.5, dist: 190, fov: 36, ahead: 26 },
     'CHASE': { pitch: 25, dist: 72, fov: 48, ahead: 24 }
   };
