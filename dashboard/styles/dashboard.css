@@ -1000,3 +1000,189 @@ html, body {
   font-size: 9px;
   color: var(--text-muted);
 }
+
+/* ==========================================================================
+   ALIGNMENT FIXES + FIT-TO-VIEWPORT + RESPONSIVE LAYOUTS
+   ========================================================================== */
+
+/* 1. Header: LIVE PERCEPTION pill truly centred (side groups differ in width) */
+.rs-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+}
+.header-left { justify-self: start; min-width: 0; }
+.header-center { justify-self: center; }
+.header-right { justify-self: end; }
+
+/* 2. Workspace row is exactly the space between header and metrics bar */
+.app-container { height: 100vh; height: 100dvh; }
+.rs-header, .rs-bottom-bar { flex-shrink: 0; }
+.main-workspace { grid-template-rows: minmax(0, 1fr); }
+.left-sidebar,
+.right-sidebar,
+.center-map-container { min-height: 0; overflow: hidden; }
+
+/* 3. Side columns fill to the map's bottom edge: panel wrappers share the
+      height (same proportions the cards were designed with) */
+.left-sidebar > div,
+.right-sidebar > div {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.left-sidebar > div > .rs-card,
+.right-sidebar > div > .rs-card { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+
+#scene-info-mount { flex: 1.1 1 0; }
+#adaptive-grid-mount { flex: 1.1 1 0; }
+#semantic-legend-mount { flex: 1.25 1 0; }
+#events-mount { flex: 1.1 1 0; }
+#selected-object-mount { flex: 1.2 1 0; }
+#elevation-mount { flex: 0.9 1 0; }
+
+.rs-card > .card-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}
+.rs-card > .card-body::-webkit-scrollbar { width: 4px; }
+.rs-card > .card-body::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 2px; }
+
+/* 4. Metrics bar: six tiles spread evenly across the bar with dividers */
+.rs-bottom-bar { position: relative; z-index: 5; gap: 16px; }
+.metrics-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0;
+  max-width: 1100px;
+}
+.metric-tile {
+  padding: 0 14px;
+  border-left: 1px solid rgba(148, 163, 184, 0.12);
+  min-width: 0;
+}
+.metric-tile:first-child { border-left: none; padding-left: 0; }
+.metric-label, .metric-value { white-space: nowrap; }
+
+/* 5. Elevation ticks sit exactly under their gradient stops */
+.elevation-ticks {
+  position: relative;
+  display: block;
+  height: 12px;
+}
+.elevation-ticks span { position: absolute; top: 0; transform: translateX(-50%); }
+.elevation-ticks span:nth-child(1) { left: 0; transform: none; }
+.elevation-ticks span:nth-child(2) { left: 25%; }
+.elevation-ticks span:nth-child(3) { left: 50%; }
+.elevation-ticks span:nth-child(4) { left: 75%; }
+.elevation-ticks span:nth-child(5) { left: 100%; transform: translateX(-100%); }
+
+/* 6. Keep playback controls clear of Netlify's floating badge (bottom-right) */
+body:has(#nl-badge-frame) .rs-bottom-bar { padding-right: 190px; }
+
+/* ---- Short screens (≤ 780 px tall): tighter rhythm --------------------- */
+@media (max-height: 780px) {
+  .app-container { padding: 6px 8px; gap: 6px; }
+  .rs-header { min-height: 42px; padding: 4px 12px; }
+  .rs-card { padding: 7px 10px; }
+  .card-header { margin-bottom: 4px; padding-bottom: 2px; }
+  .info-row { padding: 2px 0; font-size: 11px; }
+  .legend-list { gap: 4px; }
+  .rs-bottom-bar { min-height: 46px; padding-top: 4px; padding-bottom: 4px; }
+  .metric-value { font-size: 16px; }
+}
+
+/* ---- Mid-width PC / small laptop -------------------------------------- */
+@media (max-width: 1400px) {
+  .main-workspace { grid-template-columns: 225px minmax(0, 1fr) 265px; }
+}
+
+/* ---- Car dashboard: wide and short (e.g. 1280x480, 1920x720) ----------- */
+@media (min-width: 900px) and (max-height: 600px) {
+  .app-container { padding: 4px 6px; gap: 4px; }
+  .rs-header { min-height: 36px; padding: 3px 10px; }
+  .rs-subtitle, .mode-pill { display: none; }
+  .rs-logo-badge { width: 26px; height: 26px; font-size: 12px; }
+  .live-perception-pill { padding: 3px 12px; font-size: 11px; }
+  .main-workspace { grid-template-columns: 200px minmax(0, 1fr) 235px; gap: 5px; }
+  .rs-card { padding: 5px 8px; }
+  .card-title { font-size: 9px; }
+  .info-row { font-size: 10px; padding: 1px 0; }
+  #semantic-legend-mount { display: none; }
+  .rs-bottom-bar { min-height: 38px; padding: 3px 10px; }
+  .metric-value { font-size: 14px; }
+  .metric-label { font-size: 8px; }
+  .ctrl-btn { padding: 4px 10px; font-size: 11px; }
+  .map-hud-top-right, .map-hud-bottom-right { display: none; }
+}
+
+/* ---- Tablet & narrow windows: map on top, panels below, page scrolls --- */
+@media (max-width: 1099px) {
+  html, body { width: 100%; height: auto; overflow-x: hidden; overflow-y: auto; }
+  .app-container { height: auto; min-height: 100dvh; }
+  .rs-subtitle, .mode-pill { display: none; }
+  .live-perception-pill { white-space: nowrap; }
+  .main-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; }
+  .center-map-container { grid-column: 1 / -1; grid-row: 1; height: clamp(360px, 62vh, 640px); }
+  .left-sidebar { grid-row: 2; grid-column: 1; }
+  .right-sidebar { grid-row: 2; grid-column: 2; }
+  .left-sidebar, .right-sidebar { height: auto; overflow: visible; }
+  .left-sidebar > div, .right-sidebar > div { flex: 0 0 auto; }
+  .rs-card, .rs-card > .card-body { overflow: visible; }
+  .events-scroll-container { max-height: 180px; overflow-y: auto; }
+  .rs-bottom-bar { flex-wrap: wrap; }
+  .metrics-grid { flex-basis: 100%; max-width: none; }
+}
+
+/* ---- Phone ------------------------------------------------------------- */
+@media (max-width: 699px) {
+  .app-container { padding: 6px; gap: 6px; }
+  .rs-header { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; padding: 6px 10px; }
+  .header-center { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+  .live-perception-pill { justify-content: center; font-size: 11px; padding: 5px 10px; }
+  .header-right { gap: 6px; }
+  .status-text { font-size: 9.5px; }
+  .clock-display { font-size: 11px; }
+
+  .main-workspace { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .center-map-container { height: clamp(320px, 58vh, 520px); }
+  .left-sidebar, .right-sidebar { grid-column: 1; }
+  .right-sidebar { grid-row: 2; }
+  .left-sidebar { grid-row: 3; }
+
+  .map-hud-top-right, .map-hud-bottom-right, .compass-widget { display: none; }
+  .map-hud-top-left { top: 6px; left: 6px; min-width: 0; padding: 5px 7px; }
+  .hud-grid { font-size: 9px; column-gap: 8px; }
+  .map-hud-bottom-left { bottom: 6px; left: 6px; padding: 5px 6px; }
+  .seg-btn { padding: 6px 8px; }
+  .map-callout-card { min-width: 0; padding: 3px 6px; }
+
+  .rs-bottom-bar { flex-direction: column; align-items: stretch; padding: 8px; }
+  body:has(#nl-badge-frame) .rs-bottom-bar { padding-right: 8px; padding-bottom: 52px; }
+  .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; }
+  .metric-tile:nth-child(4) { border-left: none; padding-left: 0; }
+  .metric-tile { padding: 0 8px; }
+  .metric-value { font-size: 15px; }
+  .bottom-controls { justify-content: space-between; }
+  .ctrl-btn { flex: 1; justify-content: center; }
+}
+
+@media (hover: none) {
+  .seg-btn, .ctrl-btn { min-height: 32px; }
+}
+
+/* Stacked layouts: panels take their natural height (ID rules above set the
+   desktop proportions, so override at the same specificity) */
+@media (max-width: 1099px) {
+  #scene-info-mount, #adaptive-grid-mount, #semantic-legend-mount,
+  #events-mount, #selected-object-mount, #elevation-mount { flex: 0 0 auto; }
+  .main-workspace { flex: 0 0 auto; }
+}
+@media (max-width: 699px) {
+  .status-pill .status-text { display: none; }   /* green dot alone keeps the header on one row */
+  .status-pill { padding: 6px 8px; }
+  .rs-title { font-size: 14px; }
+}
