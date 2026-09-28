@@ -25,10 +25,9 @@ const CLASS_COLOR = {
   static_tree: SEMANTIC_COLORS.static_tree,
   pothole: SEMANTIC_COLORS.pothole,
   curb: SEMANTIC_COLORS.curb,
-  unclassified: '#94a3b8',
-  explosive: '#ff1744'
+  unclassified: '#94a3b8'
 };
-const CARD_CLASSES = new Set(['dynamic_vehicle', 'dynamic_human', 'pothole', 'unclassified', 'explosive']);
+const CARD_CLASSES = new Set(['dynamic_vehicle', 'dynamic_human', 'pothole', 'unclassified']);
 const RING_RADII = [10, 30, 60, 120];
 
 export function createPerceptionMap(container, onSelectObject) {

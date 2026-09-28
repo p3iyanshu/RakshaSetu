@@ -417,14 +417,6 @@ export function createSceneRenderer(canvas) {
           shade(w, yaw, b.l * 0.8, b.w * 0.8);
           push(tree, w.x, w.y, w.z - 0.2, b.l * 0.9, b.w * 0.9, b.h, 0, [0.12, 0.30, 0.15], 1, hl);
           break;
-        case 'explosive': {
-          // Small case with a blinking red beacon so it reads at a glance
-          const blink = Math.sin(performance.now() / 180) > 0 ? 1.6 : 0.2;
-          shade(w, yaw, b.l, b.w);
-          part(w, yaw + 0.35, 0, 0, 0, b.l, b.w, b.h, [0.24, 0.26, 0.20], hl);
-          part(w, yaw + 0.35, 0, 0, b.h, 0.14, 0.14, 0.1, [1.0, 0.1, 0.15], blink);
-          break;
-        }
         case 'curb':
           part(w, yaw, 0, 0, 0, b.l, b.w + 0.1, 0.25, [0.9, 0.78, 0.2], 0.2 + hl);
           part(w, yaw, -0.5, 0, 0, 0.5, b.w + 0.12, 0.26, [0.1, 0.1, 0.1]);

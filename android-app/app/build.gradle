@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The web dashboard (../../dashboard) is bundled into the APK at build time,
+// so the app works offline and always ships the current dashboard code.
+def webSource = file("${rootDir}/../dashboard")
+def webAssetsDir = layout.buildDirectory.dir("generated/webAssets")
+
+def syncWebAssets = tasks.register('syncWebAssets', Sync) {
+    from(webSource) {
+        // User dashboard only; the admin console ships as the Windows exe
+        include 'index.html', 'src/**', 'styles/**'
+        exclude 'src/admin.js', 'src/components/admin/**', 'styles/admin.css'
+    }
+    into webAssetsDir.map { it.dir('www') }
+}
+
+android {
+    namespace 'com.rakshasetu.app'
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 35
+        versionCode 3
+        versionName '1.2'
+    }
+
+    // The user dashboard app. (The admin console is a separate Windows exe,
+    // see ../desktop-admin.)
+    flavorDimensions 'app'
+    productFlavors {
+        dashboard {
+            dimension 'app'
+            applicationId 'com.rakshasetu.dashboard'
+            buildConfigField 'String', 'START_PAGE', '"index.html"'
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += webAssetsDir
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.named('preBuild') { dependsOn syncWebAssets }
